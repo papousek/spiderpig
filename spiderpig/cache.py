@@ -307,8 +307,9 @@ class PickleStorage:
                 return self._write(cache)
 
     def get_cache_info(self, cache):
-        result = self._read_file(self.cache_filename(cache, 'info.pickle'))
-        return result if result is not None else {}
+        with cache.lock:
+            result = self._read_file(self.cache_filename(cache, 'info.pickle'))
+            return result if result is not None else {}
 
     def load_function_dependencies(self, function):
         info = self.get_function_info(function)
@@ -318,12 +319,14 @@ class PickleStorage:
             function.add_dependency(dep_function)
 
     def get_function_info(self, function):
-        result = self._read_file(self.function_filename(function))
-        return result if result is not None else {}
+        with function.lock:
+            result = self._read_file(self.function_filename(function))
+            return result if result is not None else {}
 
     def get_info(self):
-        result = self._read_file(self.filename())
-        return result if result is not None else {}
+        with self._lock:
+            result = self._read_file(self.filename())
+            return result if result is not None else {}
 
     @property
     def functions(self):
