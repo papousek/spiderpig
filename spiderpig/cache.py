@@ -1,5 +1,6 @@
 from . import msg
 from collections import defaultdict
+from functools import reduce
 from proso.func import function_name
 from threading import currentThread, RLock
 from time import time
@@ -19,21 +20,38 @@ class Function:
     _locks = defaultdict(lambda: RLock())
     _locks_lock = RLock()
 
+    _dependencies = defaultdict(list)
+    _dependency_names = defaultdict(set)
+
     def __init__(self, raw_function):
         self._raw_function = raw_function
-        self._dependencies = []
 
     def add_dependency(self, function):
-        if function.name not in [f.name for f in self._dependencies]:
-            self._dependencies.append(function)
+        name = self.name
+        with self.lock:
+            if function.name not in self._dependency_names[name]:
+                self._dependencies[name].append(function)
+                self._dependency_names[name].add(function.name)
 
     @property
     def arguments(self):
-        return inspect.getargspec(self.raw_function).args
+        if hasattr(self.raw_function, '__wrapped__'):
+            return inspect.getargspec(self.raw_function.__wrapped__).args
+        else:
+            return inspect.getargspec(self.raw_function).args
 
     @property
     def dependencies(self):
-        return list(self._dependencies)
+        with self.lock:
+            return list(Function._dependencies[self.name])
+
+    @property
+    def dependent_arguments(self):
+        return set(self.arguments) | reduce(
+            lambda a, b: a | b,
+            [set(d.arguments) for d in self.dependencies],
+            set()
+        )
 
     @staticmethod
     def from_name(function_name):
@@ -88,31 +106,28 @@ class ExecutionContext:
     def execute(self, raw_function, persist, **kwargs):
         function = Function(raw_function)
         cache_kwargs = self._get_kwargs(function, **kwargs)
-        cache = self.cache_provider.get(function, persist, **cache_kwargs)
-        if cache in self._kwargs[currentThread()]:
+        cache = self.cache_provider.get(function, persist, dict(self._global_kwargs), **cache_kwargs)
+        if cache in self._execution_chain[currentThread()]:
             raise Exception('There is an execution cycle: {}.'.format(
                 cache.function.name
             ))
-        for execution_segment in self._execution_chain[currentThread()]:
+        for execution_segment, _ in self._execution_chain[currentThread()]:
             execution_segment.add_dependency(cache)
             execution_segment.function.add_dependency(cache.function)
-        self._execution_chain[currentThread()].append(cache)
-        self._kwargs[currentThread()][cache.name] = cache_kwargs
+        self._execution_chain[currentThread()].append((cache, cache_kwargs))
         result = cache.value
         self._execution_chain[currentThread()].pop()
-        del self._kwargs[currentThread()][cache.name]
         return result
 
     def _get_kwargs(self, function, **cache_kwargs):
-        kwargs = self._kwargs[currentThread()]
         execution_chain = self._execution_chain[currentThread()]
         valid_args = function.arguments
-        with self._lock:
-            for key, value in self._global_kwargs.items():
+        for execution_segment, segment_kwargs in execution_chain[::-1]:
+            for key, value in segment_kwargs.items():
                 if key in valid_args and key not in cache_kwargs:
                     cache_kwargs[key] = value
-        for execution_segment in execution_chain[::-1]:
-            for key, value in kwargs[execution_segment.name].items():
+        with self._lock:
+            for key, value in self._global_kwargs.items():
                 if key in valid_args and key not in cache_kwargs:
                     cache_kwargs[key] = value
         return cache_kwargs
@@ -126,18 +141,18 @@ class CacheProvider:
         self._memory_lock = RLock()
         self._debug = debug
 
-    def get(self, function, persistent, **kwargs):
+    def get(self, function, persistent, context_kwargs, **kwargs):
         if not hasattr(self, '_memory'):
             raise Exception('The constructor has not been called properly!')
         with self._memory_lock:
-            cache = self.provide(function, persistent, **kwargs)
+            cache = self.provide(function, persistent, context_kwargs, **kwargs)
             if cache.name in self._memory:
                 return self._memory[cache.name]
             self._memory[cache.name] = cache
             return cache
 
-    def provide(self, function, persistent, **kwargs):
-        return Cache(self._storage, function, persistent, debug=self._debug, **kwargs)
+    def provide(self, function, persistent, context_kwargs, **kwargs):
+        return Cache(self._storage, function, persistent, context_kwargs, debug=self._debug, **kwargs)
 
     @property
     def storage(self):
@@ -149,7 +164,7 @@ class Cache:
     _locks = defaultdict(lambda: RLock())
     _locks_lock = RLock()
 
-    def __init__(self, storage, function, persistent, debug=False, **kwargs):
+    def __init__(self, storage, function, persistent, context_kwargs, debug=False, **kwargs):
         self._function = function
         self._kwargs = kwargs
         self._storage = storage
@@ -158,10 +173,15 @@ class Cache:
         self._dependencies = []
         self._debug = debug
         self._persistent = persistent
+        self._context_kwargs = context_kwargs
 
     def add_dependency(self, cache):
         if cache.name not in [c.name for c in self._dependencies]:
             self._dependencies.append(cache)
+
+    @property
+    def context_kwargs(self):
+        return dict(self._context_kwargs)
 
     @property
     def dependencies(self):
@@ -182,7 +202,13 @@ class Cache:
 
     @property
     def name(self):
-        return hashlib.sha1((self.function.name + json.dumps(self.kwargs, sort_keys=True)).encode()).hexdigest()
+        context_kwargs = {}
+        for arg in self.function.dependent_arguments:
+            if arg in self._context_kwargs and arg not in self.kwargs:
+                context_kwargs[arg] = self._context_kwargs[arg]
+        return hashlib.sha1((
+            self.function.name + json.dumps(self.kwargs, sort_keys=True) + json.dumps(context_kwargs, sort_keys=True)
+        ).encode()).hexdigest()
 
     @property
     def persistent(self):
@@ -219,6 +245,10 @@ class CacheStorage(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def get_function_dependencies(self, cache):
+        pass
+
+    @abc.abstractmethod
     def get_function_info(self, function):
         pass
 
@@ -252,15 +282,17 @@ class PickleStorage:
         self._debug = debug
 
     def caches(self, function):
+        self.load_function_dependencies(function)
         function_dir = '{}/{}'.format(self._directory, function.name)
         cache_infos = [f for f in os.listdir(function_dir) if f.endswith('.info.pickle')]
         result = []
         for cache_info_filename in cache_infos:
             cache_info = self._read_file(os.path.join(function_dir, cache_info_filename))
-            result.append(Cache(self, function, cache_info['kwargs']))
+            result.append(Cache(self, function, True, cache_info['context_kwargs'], **cache_info['kwargs']))
         return result
 
     def get(self, cache):
+        self.load_function_dependencies(cache.function)
         with cache.lock:
             if self.is_valid(cache):
                 cache_info = self.get_cache_info(cache)
@@ -277,6 +309,13 @@ class PickleStorage:
     def get_cache_info(self, cache):
         result = self._read_file(self.cache_filename(cache, 'info.pickle'))
         return result if result is not None else {}
+
+    def load_function_dependencies(self, function):
+        info = self.get_function_info(function)
+        for dep in info.get('dependencies', []):
+            dep_function = Function.from_name(dep)
+            self.load_function_dependencies(dep_function)
+            function.add_dependency(dep_function)
 
     def get_function_info(self, function):
         result = self._read_file(self.function_filename(function))
@@ -379,7 +418,14 @@ class PickleStorage:
                 for dep_cache in cache.dependencies:
                     dependencies[self.cache_filename(dep_cache, 'info.pickle')] = self.get_cache_info(dep_cache)['stamp']
             self._write_file(self.cache_filename(cache), value)
-            self.write_cache_info(cache, kwargs=cache.kwargs, stamp=cache_stamp, dependencies=dependencies)
+            self.write_cache_info(
+                cache,
+                kwargs=cache.kwargs,
+                context_kwargs=cache.context_kwargs,
+                stamp=cache_stamp,
+                dependencies=dependencies,
+                function=cache.function.name
+            )
         with cache.function.lock:
             dependencies = self.get_function_info(cache.function).get('dependencies', [])
             for dep_fun in cache.function.dependencies:

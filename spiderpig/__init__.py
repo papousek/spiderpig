@@ -40,7 +40,9 @@ class spiderpig:
         return _wrapper
 
 
-def run_spiderpig(command_packages, argument_parser=None):
+def run_spiderpig(command_packages, argument_parser=None, setup_functions=None):
+    if setup_functions is None:
+        setup_functions = []
     parser = config.get_argument_parser() if argument_parser is None else argument_parser
     subparsers = parser.add_subparsers()
     for command_package in command_packages:
@@ -50,6 +52,8 @@ def run_spiderpig(command_packages, argument_parser=None):
     args = vars(parser.parse_args())
 
     args = config.process_kwargs(args)
-    init_spiderpig(args['cache_dir'], **args)
+    init_spiderpig(args['cache_dir'], **{k: v for (k, v) in args.items() if k != 'func'})
 
+    for setup_fun in setup_functions:
+        execution_context().execute(setup_fun, False)
     commands.execute(args)
