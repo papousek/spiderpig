@@ -30,7 +30,14 @@ def register_submodule_commands(subparsers, package, namespace=None):
     prefix = package.__name__ + "."
     for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__, prefix):
         if not ispkg:
-            register_submodule_command(subparsers, importer.find_module(module_name).load_module(module_name), namespace=namespace)
+            submodule = importer.find_module(module_name).load_module(module_name)
+            if not is_submodule_command(submodule):
+                continue
+            register_submodule_command(subparsers, submodule, namespace=namespace)
+
+
+def is_submodule_command(submodule):
+    return hasattr(submodule, 'execute')
 
 
 def execute(args):
