@@ -40,14 +40,20 @@ class spiderpig:
         return _wrapper
 
 
-def run_spiderpig(command_packages, argument_parser=None, setup_functions=None):
+def run_spiderpig(command_packages=None, namespaced_command_packages=None, argument_parser=None, setup_functions=None):
+    if command_packages is None:
+        command_packages = []
+    if namespaced_command_packages is None:
+        namespaced_command_packages = {}
     if setup_functions is None:
         setup_functions = []
     parser = config.get_argument_parser() if argument_parser is None else argument_parser
     subparsers = parser.add_subparsers()
     for command_package in command_packages:
         commands.register_submodule_commands(subparsers, command_package)
-    commands.register_submodule_commands(subparsers, common)
+    for command_namespace, command_package in namespaced_command_packages.items():
+        commands.register_submodule_commands(subparsers, command_package, namespace=command_namespace)
+    commands.register_submodule_commands(subparsers, common, namespace='spiderpig')
     argcomplete.autocomplete(parser)
     args = vars(parser.parse_args())
 

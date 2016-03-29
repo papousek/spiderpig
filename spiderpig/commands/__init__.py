@@ -3,11 +3,12 @@ import pkgutil
 from spiderpig import msg
 
 
-def register_submodule_command(subparsers, submodule):
+def register_submodule_command(subparsers, submodule, namespace=None):
     if 'command_name' in dir(submodule):
         command_name = submodule.command_name()
     else:
         command_name = submodule.__name__.split('.')[-1]
+    command_name = command_name if namespace is None else '{}-{}'.format(namespace, command_name)
     subparser = subparsers.add_parser(command_name, help=submodule.__doc__)
     if 'init_parser' in dir(submodule):
         submodule.init_parser(subparser)
@@ -25,11 +26,11 @@ def register_submodule_command(subparsers, submodule):
     subparser.set_defaults(func=submodule.execute)
 
 
-def register_submodule_commands(subparsers, package):
+def register_submodule_commands(subparsers, package, namespace=None):
     prefix = package.__name__ + "."
     for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__, prefix):
         if not ispkg:
-            register_submodule_command(subparsers, importer.find_module(module_name).load_module(module_name))
+            register_submodule_command(subparsers, importer.find_module(module_name).load_module(module_name), namespace=namespace)
 
 
 def execute(args):

@@ -3,10 +3,6 @@ from spiderpig.cache import Function
 import spiderpig.msg as msg
 
 
-def command_name():
-    return "spiderpig-info"
-
-
 def execute(function_name=None):
     storage = execution_context().cache_provider.storage
     if function_name is None:
