@@ -17,6 +17,7 @@ setup(
         'spiderpig.commands.common',
     ],
     install_requires=[
+        'argcomplete==1.1.1',
         'pandas==0.17.1',
     ],
     license='MIT',
