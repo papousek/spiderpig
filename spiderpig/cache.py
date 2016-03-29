@@ -1,7 +1,7 @@
 from . import msg
 from collections import defaultdict
 from functools import reduce
-from proso.func import function_name
+from spiderpig.func import function_name
 from threading import currentThread, RLock
 from time import time
 import abc

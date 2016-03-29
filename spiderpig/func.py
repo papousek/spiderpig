@@ -7,7 +7,7 @@ def is_lambda(fun):
 
     .. testsetup::
 
-        from proso.func import is_lambda
+        from spiderpig.func import is_lambda
 
     .. testcode::
 
