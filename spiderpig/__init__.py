@@ -34,7 +34,10 @@ class spiderpig:
     def __call__(self, func):
 
         @wraps(func)
-        def _wrapper(**kwargs):
+        def _wrapper(*args, **kwargs):
+            def_args = spcache.Function(func).arguments
+            for k, v in zip(def_args, args):
+                kwargs[k] = v
             return execution_context().execute(func, self._cached, **kwargs)
 
         return _wrapper
