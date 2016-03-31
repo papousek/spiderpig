@@ -7,7 +7,7 @@ def register_submodule_command(subparsers, submodule, namespace=None):
     if 'command_name' in dir(submodule):
         command_name = submodule.command_name()
     else:
-        command_name = submodule.__name__.split('.')[-1]
+        command_name = submodule.__name__.split('.')[-1].replace('_', '-')
     command_name = command_name if namespace is None else '{}-{}'.format(namespace, command_name)
     subparser = subparsers.add_parser(command_name, help=submodule.__doc__)
     if 'init_parser' in dir(submodule):
