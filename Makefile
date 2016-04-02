@@ -1,4 +1,4 @@
-upload: test register
+upload: register
 	python setup.py sdist upload
 
 register:
