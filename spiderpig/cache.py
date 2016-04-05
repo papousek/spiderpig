@@ -207,7 +207,7 @@ class Cache:
             if arg in self._context_kwargs and arg not in self.kwargs:
                 context_kwargs[arg] = self._context_kwargs[arg]
         return hashlib.sha1((
-            self.function.name + json.dumps(self.kwargs, sort_keys=True) + json.dumps(context_kwargs, sort_keys=True)
+            self.function.name + _serialize(self.kwargs) + _serialize(context_kwargs)
         ).encode()).hexdigest()
 
     @property
@@ -445,3 +445,19 @@ class PickleStorage:
         else:
             with open(filename, 'wb') as f:
                 pickle.dump(data, f)
+
+
+def _serialize(x):
+
+    try:
+        return json.dumps(x, sort_keys=True)
+    except TypeError:
+        if isinstance(x, dict):
+            return json.dumps({k: _serialize(v) for (k, v) in x.items()})
+        elif isinstance(x, list):
+            return json.dumps([_serialize(v) for v in x])
+        else:
+            return json.dumps({
+                'class': str(x.__class__),
+                'data': x.__dict__,
+            }, sort_keys=True)
