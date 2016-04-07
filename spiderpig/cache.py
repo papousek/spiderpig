@@ -452,12 +452,11 @@ def _serialize(x):
         return json.dumps(x, sort_keys=True)
     except TypeError:
         if isinstance(x, dict):
-            return json.dumps({str(k): _serialize(v) for (k, v) in x.items()})
+            return json.dumps([(k, _serialize(v)) for (k, v) in x.items()])
         elif isinstance(x, list):
             return json.dumps([_serialize(v) for v in x])
         else:
             return json.dumps({
                 'class': str(x.__class__),
-                'data': _serialize(x.__dict__),
+                'data': x.__dict__,
             }, sort_keys=True)
-    return hashlib.sha1(pickle.dumps(x)).hexdigest()
