@@ -8,6 +8,7 @@ import abc
 import hashlib
 import importlib
 import inspect
+import json
 import os
 import pandas
 import pickle
@@ -225,8 +226,8 @@ class Cache:
         time_before = time()
         result = self.function(**self.kwargs)
         if self.persistent and self._debug:
-            msg.info('computing cache for function {} with the following parameters took {} seconds:'.format(
-                self.function.name, time() - time_before
+            msg.info('computing cache {} for function {} with the following parameters took {} seconds:'.format(
+                self.name, self.function.name, time() - time_before
             ))
             for key, value in sorted(self.kwargs.items()):
                 msg.info('    {}: {}'.format(key, value))
@@ -447,4 +448,16 @@ class PickleStorage:
 
 
 def _serialize(x):
+    try:
+        return json.dumps(x, sort_keys=True)
+    except TypeError:
+        if isinstance(x, dict):
+            return json.dumps({str(k): _serialize(v) for (k, v) in x.items()})
+        elif isinstance(x, list):
+            return json.dumps([_serialize(v) for v in x])
+        else:
+            return json.dumps({
+                'class': str(x.__class__),
+                'data': _serialize(x.__dict__),
+            }, sort_keys=True)
     return hashlib.sha1(pickle.dumps(x)).hexdigest()
