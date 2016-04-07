@@ -8,7 +8,6 @@ import abc
 import hashlib
 import importlib
 import inspect
-import json
 import os
 import pandas
 import pickle
@@ -448,16 +447,4 @@ class PickleStorage:
 
 
 def _serialize(x):
-
-    try:
-        return json.dumps(x, sort_keys=True)
-    except TypeError:
-        if isinstance(x, dict):
-            return json.dumps({k: _serialize(v) for (k, v) in x.items()})
-        elif isinstance(x, list):
-            return json.dumps([_serialize(v) for v in x])
-        else:
-            return json.dumps({
-                'class': str(x.__class__),
-                'data': x.__dict__,
-            }, sort_keys=True)
+    return hashlib.sha1(pickle.dumps(x)).hexdigest()
