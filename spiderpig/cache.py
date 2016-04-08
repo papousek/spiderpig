@@ -452,7 +452,7 @@ def _serialize(x):
         return json.dumps(x, sort_keys=True)
     except TypeError:
         if isinstance(x, dict):
-            return json.dumps([(k, _serialize(v)) for (k, v) in x.items()])
+            return json.dumps(sorted([(k, _serialize(v)) for (k, v) in x.items()]), sort_keys=True)
         elif isinstance(x, list):
             return json.dumps([_serialize(v) for v in x])
         else:
