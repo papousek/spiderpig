@@ -49,7 +49,7 @@ class Function:
     def dependent_arguments(self):
         return set(self.arguments) | reduce(
             lambda a, b: a | b,
-            [set(d.arguments) for d in self.dependencies],
+            [d.dependent_arguments for d in self.dependencies],
             set()
         )
 
