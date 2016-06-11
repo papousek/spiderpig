@@ -135,20 +135,32 @@ class ExecutionContext:
 
 class CacheProvider:
 
-    def __init__(self, storage, debug=False):
+    def __init__(self, storage, debug=False, max_entries=1000):
         self._storage = storage
         self._memory = {}
         self._memory_lock = RLock()
         self._debug = debug
+        self._max_entries = max_entries
+        self._current_time = 0
 
     def get(self, function, persistent, context_kwargs, **kwargs):
         if not hasattr(self, '_memory'):
             raise Exception('The constructor has not been called properly!')
         with self._memory_lock:
+            self._current_time += 1
             cache = self.provide(function, persistent, context_kwargs, **kwargs)
-            if cache.name in self._memory:
-                return self._memory[cache.name]
-            self._memory[cache.name] = cache
+            found = self._memory.get(cache.name)
+            if found is not None:
+                found[1] = self._current_time
+                return found[0]
+            self._memory[cache.name] = cache, self._current_time
+            if self._max_entries is not None and len(self._memory) > self._max_entries:
+                if self._debug:
+                    msg.info('deleting entries from memory cache')
+                for i, (key, _) in enumerate(sorted(self._memory.items(), key=lambda x: x[1][1])):
+                    del self._memory[key]
+                    if i >= self._max_entries / 2:
+                        break
             return cache
 
     def provide(self, function, persistent, context_kwargs, **kwargs):

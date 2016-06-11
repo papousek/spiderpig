@@ -11,10 +11,10 @@ from functools import wraps
 _EXECUTION_CONTEXT = None
 
 
-def init_spiderpig(directory, override_cache=False, debug=False, **global_kwargs):
+def init_spiderpig(directory, override_cache=False, debug=False, max_entries=None, **global_kwargs):
     global _EXECUTION_CONTEXT
     storage = spcache.PickleStorage(directory, override=override_cache, debug=debug)
-    cache_provider = spcache.CacheProvider(storage, debug=debug)
+    cache_provider = spcache.CacheProvider(storage, debug=debug, max_entries=max_entries)
     _EXECUTION_CONTEXT = spcache.ExecutionContext(cache_provider)
     _EXECUTION_CONTEXT.add_global_kwargs(**global_kwargs)
 

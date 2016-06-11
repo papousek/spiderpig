@@ -20,6 +20,12 @@ def get_argument_parser():
         action='store_true',
         dest='debug',
         default=False)
+    p.add_argument(
+        '--max-entries',
+        action='store',
+        dest='max_entries',
+        default=None
+    )
     return p
 
 
