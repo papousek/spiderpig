@@ -153,7 +153,7 @@ class CacheProvider:
             if found is not None:
                 found[1] = self._current_time
                 return found[0]
-            self._memory[cache.name] = cache, self._current_time
+            self._memory[cache.name] = [cache, self._current_time]
             if self._max_entries is not None and len(self._memory) > self._max_entries:
                 if self._debug:
                     msg.info('deleting entries from memory cache')
