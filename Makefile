@@ -15,3 +15,6 @@ uninstall:
 
 check:
 	flake8 --ignore=E501,E225,E123,E128,W503,E731 spiderpig
+
+develop:
+	python setup.py develop
