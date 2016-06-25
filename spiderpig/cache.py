@@ -451,7 +451,11 @@ class PickleStorage:
     def _write_file(self, filename, data):
         directory = os.path.dirname(filename)
         if not os.path.exists(directory):
-            os.makedirs(directory)
+            try:
+                os.makedirs(directory)
+            except OSError as err:
+                if err.errno != 17:
+                    raise
         if isinstance(data, pandas.DataFrame):
             data.to_pickle('{}.dataframe'.format(filename))
         else:
