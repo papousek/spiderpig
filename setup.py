@@ -18,6 +18,7 @@ setup(
     ],
     install_requires=[
         'argcomplete==1.1.1',
+        'filelock==2.0.6',
         'pandas==0.17.1',
     ],
     license='MIT',

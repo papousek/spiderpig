@@ -1,11 +1,12 @@
 from . import msg
+from .locking import RLock
 from collections import defaultdict
 from functools import reduce
 from spiderpig.func import function_name
-from threading import currentThread, RLock
 from time import time
 import abc
 import hashlib
+import glob
 import importlib
 import inspect
 import json
@@ -17,9 +18,6 @@ import re
 
 class Function:
 
-    _locks = defaultdict(lambda: RLock())
-    _locks_lock = RLock()
-
     _dependencies = defaultdict(list)
     _dependency_names = defaultdict(set)
 
@@ -28,10 +26,9 @@ class Function:
 
     def add_dependency(self, function):
         name = self.name
-        with self.lock:
-            if function.name not in self._dependency_names[name]:
-                self._dependencies[name].append(function)
-                self._dependency_names[name].add(function.name)
+        if function.name not in self._dependency_names[name]:
+            self._dependencies[name].append(function)
+            self._dependency_names[name].add(function.name)
 
     @property
     def arguments(self):
@@ -42,8 +39,7 @@ class Function:
 
     @property
     def dependencies(self):
-        with self.lock:
-            return list(Function._dependencies[self.name])
+        return list(Function._dependencies[self.name])
 
     @property
     def dependent_arguments(self):
@@ -58,11 +54,6 @@ class Function:
         matched = re.match('(.*)\.(\w+)', function_name)
         module = importlib.import_module(matched.groups()[0])
         return Function(getattr(module, matched.groups()[1]))
-
-    @property
-    def lock(self):
-        with Function._locks_lock:
-            return Function._locks[self.name]
 
     @property
     def name(self):
@@ -89,47 +80,43 @@ class ExecutionContext:
 
     def __init__(self, cache_provider):
         self._cache_provider = cache_provider
-        self._execution_chain = defaultdict(list)
+        self._execution_chain = []
         self._global_kwargs = dict()
         self._kwargs = defaultdict(lambda: defaultdict(dict))
-        self._lock = RLock()
 
     @property
     def cache_provider(self):
         return self._cache_provider
 
     def add_global_kwargs(self, **kwargs):
-        with self._lock:
-            for key, value in kwargs.items():
-                self._global_kwargs[key] = value
+        for key, value in kwargs.items():
+            self._global_kwargs[key] = value
 
     def execute(self, raw_function, persist, **kwargs):
         function = Function(raw_function)
         cache_kwargs = self._get_kwargs(function, **kwargs)
         cache = self.cache_provider.get(function, persist, dict(self._global_kwargs), **cache_kwargs)
-        if cache in self._execution_chain[currentThread()]:
+        if cache in self._execution_chain:
             raise Exception('There is an execution cycle: {}.'.format(
                 cache.function.name
             ))
-        for execution_segment, _ in self._execution_chain[currentThread()]:
+        for execution_segment, _ in self._execution_chain:
             execution_segment.add_dependency(cache)
             execution_segment.function.add_dependency(cache.function)
-        self._execution_chain[currentThread()].append((cache, cache_kwargs))
+        self._execution_chain.append((cache, cache_kwargs))
         result = cache.value
-        self._execution_chain[currentThread()].pop()
+        self._execution_chain.pop()
         return result
 
     def _get_kwargs(self, function, **cache_kwargs):
-        execution_chain = self._execution_chain[currentThread()]
         valid_args = function.arguments
-        for execution_segment, segment_kwargs in execution_chain[::-1]:
+        for execution_segment, segment_kwargs in self._execution_chain[::-1]:
             for key, value in segment_kwargs.items():
                 if key in valid_args and key not in cache_kwargs:
                     cache_kwargs[key] = value
-        with self._lock:
-            for key, value in self._global_kwargs.items():
-                if key in valid_args and key not in cache_kwargs:
-                    cache_kwargs[key] = value
+        for key, value in self._global_kwargs.items():
+            if key in valid_args and key not in cache_kwargs:
+                cache_kwargs[key] = value
         return cache_kwargs
 
 
@@ -138,7 +125,6 @@ class CacheProvider:
     def __init__(self, storage, debug=False, max_entries=1000):
         self._storage = storage
         self._memory = {}
-        self._memory_lock = RLock()
         self._debug = debug
         self._max_entries = max_entries
         self._current_time = 0
@@ -146,22 +132,21 @@ class CacheProvider:
     def get(self, function, persistent, context_kwargs, **kwargs):
         if not hasattr(self, '_memory'):
             raise Exception('The constructor has not been called properly!')
-        with self._memory_lock:
-            self._current_time += 1
-            cache = self.provide(function, persistent, context_kwargs, **kwargs)
-            found = self._memory.get(cache.name)
-            if found is not None:
-                found[1] = self._current_time
-                return found[0]
-            self._memory[cache.name] = [cache, self._current_time]
-            if self._max_entries is not None and len(self._memory) > self._max_entries:
-                if self._debug:
-                    msg.info('deleting entries from memory cache')
-                for i, (key, _) in enumerate(sorted(self._memory.items(), key=lambda x: x[1][1])):
-                    del self._memory[key]
-                    if i >= self._max_entries / 2:
-                        break
-            return cache
+        self._current_time += 1
+        cache = self.provide(function, persistent, context_kwargs, **kwargs)
+        found = self._memory.get(cache.name)
+        if found is not None:
+            found[1] = self._current_time
+            return found[0]
+        self._memory[cache.name] = [cache, self._current_time]
+        if self._max_entries is not None and len(self._memory) > self._max_entries:
+            if self._debug:
+                msg.info('deleting entries from memory cache')
+            for i, (key, _) in enumerate(sorted(self._memory.items(), key=lambda x: x[1][1])):
+                del self._memory[key]
+                if i >= self._max_entries / 2:
+                    break
+        return cache
 
     def provide(self, function, persistent, context_kwargs, **kwargs):
         return Cache(self._storage, function, persistent, context_kwargs, debug=self._debug, **kwargs)
@@ -172,9 +157,6 @@ class CacheProvider:
 
 
 class Cache:
-
-    _locks = defaultdict(lambda: RLock())
-    _locks_lock = RLock()
 
     def __init__(self, storage, function, persistent, context_kwargs, debug=False, **kwargs):
         self._function = function
@@ -208,11 +190,6 @@ class Cache:
         return self._kwargs
 
     @property
-    def lock(self):
-        with Cache._locks_lock:
-            return Cache._locks[self.name]
-
-    @property
     def name(self):
         context_kwargs = {}
         for arg in self.function.dependent_arguments:
@@ -238,8 +215,8 @@ class Cache:
         time_before = time()
         result = self.function(**self.kwargs)
         if self.persistent and self._debug:
-            msg.info('{} computing cache {} for function {} with the following parameters took {} seconds:'.format(
-                currentThread(), self.name, self.function.name, time() - time_before
+            msg.info('computing cache {} for function {} with the following parameters took {} seconds:'.format(
+                self.name, self.function.name, time() - time_before
             ))
             for key, value in sorted(self.kwargs.items()):
                 msg.info('    {}: {}'.format(key, value))
@@ -289,9 +266,10 @@ class PickleStorage:
 
     def __init__(self, directory, override=False, debug=False):
         self._directory = directory
-        self._lock = RLock()
         self._override = override
         self._debug = debug
+        for filename in glob.glob("/tmp/spiderpig_cache__*"):
+            os.remove(filename)
 
     def caches(self, function):
         self.load_function_dependencies(function)
@@ -305,65 +283,60 @@ class PickleStorage:
 
     def get(self, cache):
         self.load_function_dependencies(cache.function)
-        with cache.lock:
-            if self.is_valid(cache):
-                cache_info = self.get_cache_info(cache)
-                filename = self.cache_filename(cache)
-                self.write_cache_info(cache, hit=cache_info.get('hit', 0) + 1)
-                if self._debug:
-                    msg.info('{} reading cache {} with parameters: '.format(currentThread(), filename))
-                    for key, value in sorted(cache_info['kwargs'].items()):
-                        msg.info('    {}: {}'.format(key, value))
-                return self._read_file(filename)
-            else:
-                return self._write(cache)
+        if self.is_valid(cache):
+            cache_info = self.get_cache_info(cache)
+            filename = self.cache_filename(cache)
+            self.write_cache_info(cache, hit=cache_info.get('hit', 0) + 1)
+            if self._debug:
+                msg.info('reading cache {} with parameters: '.format(filename))
+                for key, value in sorted(cache_info['kwargs'].items()):
+                    msg.info('    {}: {}'.format(key, value))
+            return self._read_file(filename)
+        else:
+            return self._write(cache)
 
     def get_cache_info(self, cache):
-        with cache.lock:
-            result = self._read_file(self.cache_filename(cache, 'info.pickle'))
-            return result if result is not None else {}
+        result = self._read_file(self.cache_filename(cache, 'info.pickle'))
+        return result if result is not None else {}
 
     def load_function_dependencies(self, function):
         info = self.get_function_info(function)
-        for dep in info.get('dependencies', []):
+        if 'dependencies' not in info:
+            return
+        for dep in info['dependencies']:
             dep_function = Function.from_name(dep)
             self.load_function_dependencies(dep_function)
             function.add_dependency(dep_function)
 
     def get_function_info(self, function):
-        with function.lock:
-            result = self._read_file(self.function_filename(function))
-            return result if result is not None else {}
+        result = self._read_file(self.function_filename(function))
+        return result if result is not None else {}
 
     def get_info(self):
-        with self._lock:
-            result = self._read_file(self.filename())
-            return result if result is not None else {}
+        result = self._read_file(self.filename())
+        return result if result is not None else {}
 
     @property
     def functions(self):
         return [Function.from_name(n) for n in os.listdir(self._directory) if os.path.isdir(os.path.join(self._directory, n))]
 
     def write_cache_info(self, cache, **kwargs):
-        with cache.lock:
-            info = self.get_cache_info(cache)
-            for key, value in kwargs.items():
-                info[key] = value
-            self._write_file(self.cache_filename(cache, 'info.pickle'), info)
+        info = self.get_cache_info(cache)
+        for key, value in kwargs.items():
+            info[key] = value
+        self._write_file(self.cache_filename(cache, 'info.pickle'), info)
 
     def write_function_info(self, function, **kwargs):
-        with function.lock:
-            info = self.get_function_info(function)
-            for key, value in kwargs.items():
-                info[key] = value
-            self._write_file(self.function_filename(function), info)
+        info = self.get_function_info(function)
+        for key, value in kwargs.items():
+            info[key] = value
+        self._write_file(self.function_filename(function), info)
 
     def write_info(self, **kwargs):
-        with self._lock:
-            info = self.get_info()
-            for key, value in kwargs.items():
-                info[key] = value
-            self._write_file(self.filename(), info)
+        info = self.get_info()
+        for key, value in kwargs.items():
+            info[key] = value
+        self._write_file(self.filename(), info)
 
     def is_valid(self, cache):
         if self._override:
@@ -387,8 +360,7 @@ class PickleStorage:
                     return False
             return True
 
-        with self._lock:
-            return _is_valid(self.cache_filename(cache, 'info.pickle'))
+        return _is_valid(self.cache_filename(cache, 'info.pickle'))
 
     def cache_filename(self, cache, extension='pickle'):
         return '{}/{}/{}.{}'.format(
@@ -412,55 +384,50 @@ class PickleStorage:
         )
 
     def _read_file(self, filename):
-        if os.path.exists(filename):
-            with open(filename, 'rb') as f:
-                return pickle.load(f)
-        elif os.path.exists('{}.dataframe'.format(filename)):
-            return pandas.read_pickle('{}.dataframe'.format(filename))
-        else:
-            return None
+        with RLock('/tmp/spiderpig_lock__{}'.format(filename.replace('/', '__'))):
+            if os.path.exists(filename):
+                with open(filename, 'rb') as f:
+                    return pickle.load(f)
+            elif os.path.exists('{}.dataframe'.format(filename)):
+                return pandas.read_pickle('{}.dataframe'.format(filename))
+            else:
+                return None
 
     def _write(self, cache):
         value = cache()
         if not cache.persistent:
             return value
-        with self._lock:
-            cache_stamp = self.get_info().get('next_stamp', 0)
-            self.write_info(next_stamp=cache_stamp + 1)
-        with cache.lock:
-            dependencies = {}
-            with self._lock:
-                for dep_cache in cache.dependencies:
-                    dependencies[self.cache_filename(dep_cache, 'info.pickle')] = self.get_cache_info(dep_cache)['stamp']
-            self._write_file(self.cache_filename(cache), value)
-            self.write_cache_info(
-                cache,
-                kwargs=cache.kwargs,
-                context_kwargs=cache.context_kwargs,
-                stamp=cache_stamp,
-                dependencies=dependencies,
-                function=cache.function.name
-            )
-        with cache.function.lock:
-            dependencies = self.get_function_info(cache.function).get('dependencies', [])
-            for dep_fun in cache.function.dependencies:
-                dependencies.append(dep_fun.name)
-            self.write_function_info(cache.function, dependencies=list(set(dependencies)))
+        cache_stamp = self.get_info().get('next_stamp', 0)
+        self.write_info(next_stamp=cache_stamp + 1)
+        dependencies = {}
+        for dep_cache in cache.dependencies:
+            dependencies[self.cache_filename(dep_cache, 'info.pickle')] = self.get_cache_info(dep_cache)['stamp']
+        self._write_file(self.cache_filename(cache), value)
+        self.write_cache_info(
+            cache,
+            kwargs=cache.kwargs,
+            context_kwargs=cache.context_kwargs,
+            stamp=cache_stamp,
+            dependencies=dependencies,
+            function=cache.function.name
+        )
+        dependencies = self.get_function_info(cache.function).get('dependencies', [])
+        for dep_fun in cache.function.dependencies:
+            dependencies.append(dep_fun.name)
+        self.write_function_info(cache.function, dependencies=list(set(dependencies)))
         return value
 
     def _write_file(self, filename, data):
         directory = os.path.dirname(filename)
-        if not os.path.exists(directory):
-            try:
+        with RLock('/tmp/spiderpig_lock__{}'.format(directory.replace('/', '__'))):
+            if not os.path.exists(directory):
                 os.makedirs(directory)
-            except OSError as err:
-                if err.errno != 17:
-                    raise
-        if isinstance(data, pandas.DataFrame):
-            data.to_pickle('{}.dataframe'.format(filename))
-        else:
-            with open(filename, 'wb') as f:
-                pickle.dump(data, f)
+        with RLock('/tmp/spiderpig_lock__{}'.format(filename.replace('/', '__'))):
+            if isinstance(data, pandas.DataFrame):
+                data.to_pickle('{}.dataframe'.format(filename))
+            else:
+                with open(filename, 'wb') as f:
+                    pickle.dump(data, f)
 
 
 def _serialize(x):
