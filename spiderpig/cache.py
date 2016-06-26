@@ -238,8 +238,8 @@ class Cache:
         time_before = time()
         result = self.function(**self.kwargs)
         if self.persistent and self._debug:
-            msg.info('computing cache {} for function {} with the following parameters took {} seconds:'.format(
-                self.name, self.function.name, time() - time_before
+            msg.info('{} computing cache {} for function {} with the following parameters took {} seconds:'.format(
+                currentThread(), self.name, self.function.name, time() - time_before
             ))
             for key, value in sorted(self.kwargs.items()):
                 msg.info('    {}: {}'.format(key, value))
@@ -311,7 +311,7 @@ class PickleStorage:
                 filename = self.cache_filename(cache)
                 self.write_cache_info(cache, hit=cache_info.get('hit', 0) + 1)
                 if self._debug:
-                    msg.info('reading cache {} with parameters: '.format(filename))
+                    msg.info('{} reading cache {} with parameters: '.format(currentThread(), filename))
                     for key, value in sorted(cache_info['kwargs'].items()):
                         msg.info('    {}: {}'.format(key, value))
                 return self._read_file(filename)
