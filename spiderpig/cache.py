@@ -431,6 +431,11 @@ class PickleStorage:
 
 
 def _serialize(x):
+    if hasattr(x, 'fingerprint'):
+        return json.dumps([
+            '{}.{}'.format(x.__class__.__module__, x.__class__.__name__),
+            x.fingerprint()
+        ], sort_keys=True)
     try:
         return json.dumps(x, sort_keys=True)
     except TypeError:
