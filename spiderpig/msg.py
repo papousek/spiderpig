@@ -1,19 +1,24 @@
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
+from clint.textui import colored, puts
 
 
-def info(msg):
-    print(bcolors.OKBLUE + msg + bcolors.ENDC)
+class Verbosity:
+    INFO = 0
+    DEBUG = 1
+    VERBOSE = 2
+    INTERNAL = 3
 
 
-def success(msg):
-    print(bcolors.OKGREEN + msg + bcolors.ENDC)
+def print_debug(msg):
+    puts(colored.yellow(str(msg)))
 
 
-def error(msg):
-    print(bcolors.FAIL + msg + bcolors.ENDC)
+def print_info(msg):
+    puts(colored.blue(str(msg)))
+
+
+def print_success(msg):
+    puts(colored.green(str(msg)))
+
+
+def print_error(msg):
+    puts(colored.red(str(msg)))

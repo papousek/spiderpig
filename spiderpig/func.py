@@ -36,7 +36,4 @@ def function_name(function):
         return None
     if is_lambda(function):
         raise Exception('The function can not be a lambda function.')
-    if '__self__' in dir(function):
-        return '{}.{}.{}'.format(function.__self__.__class__.__module__, function.__self__.__class__.__name__, function.__func__.__name__)
-    else:
-        return '{}.{}'.format(function.__module__, function.__name__)
+    return '{}.{}'.format(function.__module__, function.__qualname__)

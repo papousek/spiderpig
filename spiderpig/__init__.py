@@ -1,22 +1,125 @@
-#!/usr/bin/env python
-# PYTHON_ARGCOMPLETE_OK
-
-import argcomplete
-from . import commands, config
 from . import cache as spcache
+from . import commands, config
+from . import execution as spexecution
 from .commands import common
+from .msg import Verbosity
+from contextlib import ContextDecorator
 from functools import wraps
+import argcomplete
+import json
+import tempfile
+import yaml
 
 
 _EXECUTION_CONTEXT = None
+_CACHE_PROVIDER = None
+_STORAGE = None
 
 
-def init_spiderpig(directory, override_cache=False, debug=False, max_entries=None, **global_kwargs):
+class spiderpig(ContextDecorator):
+
+    def __init__(self, directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, **global_kwargs):
+        self._directory = directory
+        self._override_cache = override_cache
+        self._verbosity = verbosity
+        self._max_entries = max_entries
+        self._global_kwargs = global_kwargs
+
+    def __enter__(self):
+        init(self._directory, self._override_cache, self._verbosity, self._max_entries, **self._global_kwargs)
+
+    def __exit__(self, *exc):
+        terminate()
+
+
+def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, **global_kwargs):
+    """
+    Initialize spiderpig for using it out of command-line tool.
+
+    Args:
+        directory: path to a directory used for spiderpig auxiliary files and cache
+        override_cache: True if you want to recompute all spiderpig functions
+            regardless of whether there is valid cache available, otherwise False
+        verbosity: increase verbosity level
+        max_entries: maximal number of entries in in-memory cache
+        global_kwargs: key-word arguments passed to spiderpig functions
+    """
     global _EXECUTION_CONTEXT
-    storage = spcache.PickleStorage(directory, override=override_cache, debug=debug)
-    cache_provider = spcache.CacheProvider(storage, debug=debug, max_entries=max_entries)
-    _EXECUTION_CONTEXT = spcache.ExecutionContext(cache_provider)
+    global _CACHE_PROVIDER
+    global _STORAGE
+    if directory is None:
+        _CACHE_PROVIDER = spcache.InMemoryCacheProvider(max_entries=max_entries)
+    else:
+        _STORAGE = spcache.FileStorage(directory if directory else tempfile.mkdtemp())
+        _CACHE_PROVIDER = spcache.InMemoryCacheProvider(
+            provider=spcache.StorageCacheProvider(
+                storage=_STORAGE, verbosity=verbosity, override=override_cache
+            ),
+            max_entries=max_entries
+        )
+    _CACHE_PROVIDER.prepare()
+    _EXECUTION_CONTEXT = spexecution.ExecutionContext(
+        cache_provider=_CACHE_PROVIDER,
+        verbosity=verbosity
+    )
     _EXECUTION_CONTEXT.add_global_kwargs(**global_kwargs)
+
+
+def terminate():
+    global _EXECUTION_CONTEXT
+    global _CACHE_PROVIDER
+    global _STORAGE
+
+    _EXECUTION_CONTEXT = None
+    _CACHE_PROVIDER = None
+    _STORAGE
+
+
+class configuration:
+
+    def __init__(self, config_file=None, **config):
+        self._config = config
+        if config_file is not None:
+            with open(config_file, 'r') as f:
+                from_config_file = json.load(f.read()) if config_file.endswith('.json') else yaml.load(f.read())
+                for key, value in from_config_file.items():
+                    if hasattr(value, '__len__') and not isinstance(value, str):
+                        raise Exception('Config "{} ({})" is not scalar.'.format(key, value))
+                from_config_file.update(self._config)
+                self._config = from_config_file
+
+    def __enter__(self):
+        if len(self._config) == 0:
+            return
+        self._current_exec_context = execution_context()
+        global _EXECUTION_CONTEXT
+        _EXECUTION_CONTEXT = spexecution.ExecutionContext(
+            cache_provider=_CACHE_PROVIDER,
+            verbosity=self._current_exec_context.verbosity
+        )
+        _EXECUTION_CONTEXT.add_global_kwargs(**self._current_exec_context.global_kwargs)
+        _EXECUTION_CONTEXT.add_global_kwargs(**self._config)
+        return self
+
+    def __exit__(self, *exc):
+        if len(self._config) == 0:
+            return
+        global _EXECUTION_CONTEXT
+        _EXECUTION_CONTEXT = self._current_exec_context
+
+
+def storage():
+    global _STORAGE
+    if _STORAGE is None:
+        raise Exception('The storage is not initialized.')
+    return _STORAGE
+
+
+def cache_provider():
+    global _CACHE_PROVIDER
+    if _CACHE_PROVIDER is None:
+        raise Exception('The cache provider is not initialized.')
+    return _CACHE_PROVIDER
 
 
 def execution_context():
@@ -26,24 +129,44 @@ def execution_context():
     return _EXECUTION_CONTEXT
 
 
-class spiderpig:
+class configured:
 
-    def __init__(self, cached=True):
+    def __init__(self, cached=False, config_file=None, **config):
         self._cached = cached
+        self._config_file = config_file
+        self._config = config
 
     def __call__(self, func):
 
         @wraps(func)
         def _wrapper(*args, **kwargs):
-            def_args = spcache.Function(func).arguments
-            for k, v in zip(def_args, args):
-                kwargs[k] = v
-            return execution_context().execute(func, self._cached, **kwargs)
+            def_args = spexecution.Function(func).arguments
+            kwargs.update(dict(zip(def_args, args)))
+            with configuration(config_file=self._config_file, **self._config):
+                return execution_context().execute(func, use_cache=self._cached, **kwargs)
 
         return _wrapper
 
 
-def run_spiderpig(command_packages=None, namespaced_command_packages=None, argument_parser=None, setup_functions=None):
+class cached(configured):
+
+    def __init__(self, config_file=None, **config):
+        super().__init__(cached=True, config_file=config_file, **config)
+
+
+def run_cli(command_packages=None, namespaced_command_packages=None, argument_parser=None, setup_functions=None):
+    """
+    Run spiderpig command-line application.
+
+    Args:
+        command_packages: list of packages containing modules representing
+            command-line commands
+        namespaced_command_packages: dictionary with packages containing
+            modules representing command-line commands; keys are used as
+            prefixes for the commands
+        argument_parser: custom argument parser (argparse.ArgumentParser instance)
+        setup_functions: functions invoked before the main command is executed
+    """
     if command_packages is None:
         command_packages = []
     if namespaced_command_packages is None:
@@ -61,8 +184,7 @@ def run_spiderpig(command_packages=None, namespaced_command_packages=None, argum
     args = vars(parser.parse_args())
 
     args = config.process_kwargs(args)
-    init_spiderpig(args['cache_dir'], **{k: v for (k, v) in args.items() if k != 'func'})
-
-    for setup_fun in setup_functions:
-        execution_context().execute(setup_fun, False)
-    commands.execute(args)
+    with spiderpig(args['cache_dir'], **{k: v for (k, v) in args.items() if k != 'func'}):
+        for setup_fun in setup_functions:
+            execution_context().execute(setup_fun, False)
+        commands.execute(args)

@@ -1,12 +1,9 @@
 from setuptools import setup
 
 
-VERSION = '1.1.0-dev'
-
-
 setup(
     name='spiderpig',
-    version=VERSION,
+    version='2.0.0-dev',
     description='Caching and execution library for data analysis.',
     author='Jan Papousek',
     author_email='jan.papousek@gmail.com',
@@ -15,11 +12,12 @@ setup(
         'spiderpig',
         'spiderpig.commands',
         'spiderpig.commands.common',
+        'spiderpig.tests',
     ],
     install_requires=[
         'argcomplete==1.1.1',
         'filelock==2.0.6',
-        'pandas==0.17.1',
+        'PyYAML==3.11',
     ],
     license='MIT',
 )

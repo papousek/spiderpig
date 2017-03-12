@@ -1,3 +1,4 @@
+from .msg import Verbosity
 import argparse
 
 
@@ -16,10 +17,11 @@ def get_argument_parser():
         dest='override_cache',
         default=False)
     p.add_argument(
-        '--debug',
-        action='store_true',
-        dest='debug',
-        default=False)
+        '--verbosity',
+        action='store',
+        dest='verbosity',
+        default=Verbosity.INFO,
+        choices=[Verbosity.INFO, Verbosity.DEBUG, Verbosity.VERBOSE, Verbosity.INTERNAL])
     p.add_argument(
         '--max-entries',
         action='store',

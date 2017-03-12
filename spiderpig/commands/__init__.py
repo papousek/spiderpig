@@ -19,7 +19,12 @@ def register_submodule_command(subparsers, submodule, namespace=None):
             return [] if x is None else x
         kwargs = dict(zip(args[-len(transform(defaults)):], transform(defaults)))
         for argname, default in kwargs.items():
-            subparser.add_argument('--{}'.format(argname), action='store', default=default, required=False, help='default: {}'.format(default))
+            if isinstance(default, bool):
+                used_argname = argname if not default else 'not-{}'.format(argname)
+                action = 'store_true' if not default else 'store_false'
+                subparser.add_argument('--{}'.format(used_argname.replace('_', '-')), action=action, required=False, help='default: {}'.format(default), dest=argname)
+            else:
+                subparser.add_argument('--{}'.format(argname.replace('_', '-')), action='store', default=default, required=False, help='default: {}'.format(default), dest=argname)
         for argname in args:
             if argname not in kwargs:
                 subparser.add_argument('--{}'.format(argname), action='store', required=True)
@@ -42,7 +47,7 @@ def is_submodule_command(submodule):
 
 def execute(args):
     if 'func' not in args:
-        msg.error('You have to choose subcommand!')
+        msg.print_error('You have to choose subcommand!')
         return
     func = args['func']
     allowed_args = inspect.getargspec(func).args

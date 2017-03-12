@@ -18,3 +18,6 @@ check:
 
 develop:
 	python setup.py develop
+
+test:
+		pytest -sv
