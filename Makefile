@@ -20,4 +20,4 @@ develop:
 	python setup.py develop
 
 test:
-		pytest -v --doctest-modules --ignore=setup.py
+	pytest -v --doctest-modules --ignore=setup.py
