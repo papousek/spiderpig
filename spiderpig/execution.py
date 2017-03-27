@@ -235,7 +235,7 @@ class ExecutionContext:
             raise Exception('Can not pass value for {} as both argument and key-word argument.'.format(kwarg_intersection))
         kwargs.update(args_kwargs)
         exec_kwargs = self._get_kwargs(function, **kwargs)
-        execution = Execution(function, dict(self._global_kwargs), verbosity=self._verbosity, **exec_kwargs)
+        execution = Execution(function, dict(self._global_kwargs), verbosity=self.verbosity, **exec_kwargs)
         execution_chain = self._execution_chain[currentThread()]
         if execution in execution_chain:
             raise Exception('There is an execution cycle: {}.'.format(
@@ -262,11 +262,12 @@ class ExecutionContext:
                 cache_kwargs[key] = value
         return cache_kwargs
 
+    @property
     def verbosity(self):
         return self._verbosity
 
     def count_executions(self, function, **kwargs):
-        return self._execution_count[str(Execution(function, {}, verbosity=self._verbosity, **kwargs))]
+        return self._execution_count[str(Execution(function, {}, verbosity=self.verbosity, **kwargs))]
 
 
 def _serialize(x):
