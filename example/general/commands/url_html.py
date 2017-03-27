@@ -1,6 +1,6 @@
 """
 Download HTML web page from the specified URL and print it on the standard
-output.
+output or to the specified file.
 """
 
 from .. import model
