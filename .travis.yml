@@ -1,0 +1,9 @@
+language: python
+python: 3.5
+cache:
+  - pip
+install:
+  - pip install flake8
+  - make install
+script:
+  - make test
