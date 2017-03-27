@@ -47,7 +47,7 @@ class spiderpig(ContextDecorator):
     init
     """
 
-    def __init__(self, directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, **global_kwargs):
+    def __init__(self, directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, config_file=None, **global_kwargs):
         """
         Initialize spiderpig for using it out of command-line tool.
 
@@ -62,6 +62,9 @@ class spiderpig(ContextDecorator):
             increase verbosity level
         max_entries: int, default 1000
             maximal number of entries in in-memory cache
+        config_file: str
+            path to the YAML/JSON file containing key-word parameters to
+            override the global configuration
         global_kwargs: dict
             key-word arguments passed to spiderpig functions
         """
@@ -70,15 +73,16 @@ class spiderpig(ContextDecorator):
         self._verbosity = verbosity
         self._max_entries = max_entries
         self._global_kwargs = global_kwargs
+        self._config_file = config_file
 
     def __enter__(self):
-        init(self._directory, self._override_cache, self._verbosity, self._max_entries, **self._global_kwargs)
+        init(self._directory, self._override_cache, self._verbosity, self._max_entries, self._config_file, **self._global_kwargs)
 
     def __exit__(self, *exc):
         terminate()
 
 
-def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, **global_kwargs):
+def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, config_file=None, **global_kwargs):
     """
     Initialize spiderpig for using it out of command-line tool.
 
@@ -93,6 +97,9 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_ent
         increase verbosity level
     max_entries: int, default 1000
         maximal number of entries in in-memory cache
+    config_file: str
+        path to the YAML/JSON file containing key-word parameters to
+        override the global configuration
     global_kwargs: dict
         key-word arguments passed to spiderpig functions
 
@@ -120,6 +127,14 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_ent
     global _EXECUTION_CONTEXT
     global _CACHE_PROVIDER
     global _STORAGE
+    if config_file is not None:
+        with open(config_file, 'r') as f:
+            from_config_file = json.load(f.read()) if config_file.endswith('.json') else yaml.load(f.read())
+            for key, value in from_config_file.items():
+                if hasattr(value, '__len__') and not isinstance(value, str):
+                    raise Exception('Config "{} ({})" is not scalar.'.format(key, value))
+            from_config_file.update(global_kwargs)
+            global_kwargs= from_config_file
     if directory is None:
         _CACHE_PROVIDER = cache.InMemoryCacheProvider(max_entries=max_entries)
     else:
@@ -268,7 +283,7 @@ class configured:
     cached
     """
 
-    def __init__(self, cached=False, config_file=None, **config):
+    def __init__(self, cached=False, **config):
         """
         Create a decorator instance.
 
@@ -276,14 +291,10 @@ class configured:
         ----------
         cached: bool, default False
             turn on caching
-        config_file: str
-            path to the YAML/JSON file containing key-word parameters to
-            override the global configuration
         config: dict
             key-word parameters to override the global configuration
         """
         self._cached = cached
-        self._config_file = config_file
         self._config = config
 
     def __call__(self, func):
@@ -292,7 +303,7 @@ class configured:
         def _wrapper(*args, **kwargs):
             def_args = execution.Function(func).arguments
             kwargs.update(dict(zip(def_args, args)))
-            with configuration(config_file=self._config_file, **self._config):
+            with configuration(**self._config):
                 return execution_context().execute(func, use_cache=self._cached, **kwargs)
 
         return _wrapper
@@ -333,7 +344,7 @@ class cached(configured):
     configured
     """
 
-    def __init__(self, config_file=None, **config):
+    def __init__(self, **config):
         """
         Create a decorator instance.
 
@@ -341,13 +352,10 @@ class cached(configured):
         ----------
         cached: bool, default False
             turn on caching
-        config_file: str
-            path to the YAML/JSON file containing key-word parameters to
-            override the global configuration
         config: dict
             key-word parameters to override the global configuration
         """
-        super().__init__(cached=True, config_file=config_file, **config)
+        super().__init__(cached=True, **config)
 
 
 def run_cli(command_packages=None, namespaced_command_packages=None, argument_parser=None, setup_functions=None):
