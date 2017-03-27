@@ -1,0 +1,5 @@
+site_name: spiderpig
+theme: readthedocs
+pages:
+  - 'Introduction': index.md
+  - 'Examples': examples.md
