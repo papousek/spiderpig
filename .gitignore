@@ -1,6 +1,7 @@
-dist
-*.pyc
 *.egg-info
-.ropeproject
+*.pyc
 *.sw[pon]
+.ropeproject
+.spiderpig
 build
+dist
