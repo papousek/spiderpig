@@ -20,13 +20,14 @@ def get_argument_parser():
         '--verbosity',
         action='store',
         dest='verbosity',
+        type=int,
         default=Verbosity.INFO,
         choices=[Verbosity.INFO, Verbosity.DEBUG, Verbosity.VERBOSE, Verbosity.INTERNAL])
     p.add_argument(
         '--max-entries',
         action='store',
         dest='max_entries',
-        default=None
+        default=1000
     )
     return p
 
