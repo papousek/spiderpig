@@ -371,7 +371,7 @@ def run_cli(command_packages=None, namespaced_command_packages=None, argument_pa
         argument_parser: custom argument parser (argparse.ArgumentParser instance)
         setup_functions: functions invoked before the main command is executed
     """
-    import spiderpig.commands.common
+    import spiderpig.commands.common as spcommon
     if command_packages is None:
         command_packages = []
     if namespaced_command_packages is None:
@@ -384,7 +384,7 @@ def run_cli(command_packages=None, namespaced_command_packages=None, argument_pa
         commands.register_submodule_commands(subparsers, command_package)
     for command_namespace, command_package in namespaced_command_packages.items():
         commands.register_submodule_commands(subparsers, command_package, namespace=command_namespace)
-    commands.register_submodule_commands(subparsers, spiderpig.commands.common, namespace='spiderpig')
+    commands.register_submodule_commands(subparsers, spcommon, namespace='spiderpig')
     argcomplete.autocomplete(parser)
     args = vars(parser.parse_args())
 
