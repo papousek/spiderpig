@@ -206,7 +206,7 @@ optional arguments:
   --max-entries MAX_ENTRIES
 $
 ```
-It automatically create `argparse` configuration from parameters of your
+It automatically creates `argparse` configuration parsers from parameters of your
 `execute` function:
 ```
 $ ./crawler.py url-html --help
