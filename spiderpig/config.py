@@ -9,7 +9,7 @@ def get_argument_parser():
         '--cache-dir',
         action='store',
         dest='cache_dir',
-        default='cache'
+        default='.spiderpig'
     )
     p.add_argument(
         '--override-cache',
