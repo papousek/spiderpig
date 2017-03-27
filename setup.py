@@ -15,9 +15,10 @@ setup(
         'spiderpig.tests',
     ],
     install_requires=[
-        'argcomplete==1.1.1',
-        'filelock==2.0.6',
-        'PyYAML==3.11',
+        'argcomplete',
+        'clint',
+        'filelock',
+        'PyYAML',
     ],
     license='MIT',
 )

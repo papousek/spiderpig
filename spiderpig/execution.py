@@ -1,8 +1,10 @@
 from .func import function_name
 from .msg import Verbosity, print_debug
+from clint.textui import indent
 from collections import defaultdict
 from functools import reduce
 from glob import iglob
+from threading import currentThread
 from time import time
 import filelock
 import hashlib
@@ -12,7 +14,6 @@ import json
 import os
 import re
 import tempfile
-from threading import currentThread
 
 
 class Function:
@@ -25,7 +26,7 @@ class Function:
 
     def add_dependency(self, function):
         name = self.name
-        if function.name not in self._dependency_names[name]:
+        if function.name != name and function.name not in self._dependency_names[name]:
             self._dependencies[name].append(function)
             self._dependency_names[name].add(function.name)
 
@@ -100,7 +101,7 @@ class Function:
 
 class Execution:
 
-    def __init__(self, function, context_kwargs, **kwargs):
+    def __init__(self, function, context_kwargs, verbosity=Verbosity.INFO, **kwargs):
         if isinstance(function, Function):
             self._function = function
         elif isinstance(function, str):
@@ -113,6 +114,7 @@ class Execution:
         self._executed = False
         self._dependencies = []
         self._time = None
+        self._verbosity = verbosity
 
     def add_dependency(self, execution):
         if execution.name not in {e.name for e in self._dependencies}:
@@ -132,7 +134,7 @@ class Execution:
 
     @property
     def kwargs(self):
-        return self._kwargs
+        return dict(self._kwargs)
 
     @property
     def name(self):
@@ -153,14 +155,15 @@ class Execution:
         }
 
     @staticmethod
-    def from_serializable(serializable):
+    def from_serializable(serializable, verbosity=Verbosity.INFO):
         execution = Execution(
             function=Function.from_serializable(serializable['function']),
             context_kwargs=serializable['context_kwargs'],
+            verbosity=verbosity,
             **serializable['kwargs']
         )
         for d in serializable['dependencies']:
-            execution.add_dependency(Execution.from_serializable(d))
+            execution.add_dependency(Execution.from_serializable(d, verbosity=verbosity))
         return execution
 
     @property
@@ -170,9 +173,17 @@ class Execution:
     def __call__(self):
         if not self._executed:
             time_before = time()
-            self._value = self.function(**self.kwargs)
+            kwargs = self.kwargs
+            if 'verbosity' in self._function.arguments:
+                kwargs['verbosity'] = self._verbosity
+            self._value = self.function(**kwargs)
             self._time = time() - time_before
             self._executed = True
+            if self._verbosity > Verbosity.DEBUG:
+                print_debug('execution {0} took {1:.3f} seconds'.format(self.name, self._time))
+                with indent(4):
+                    for key, val in sorted(self.kwargs.items()):
+                        print_debug('{}: {}'.format(key, val))
         return self._value
 
     def __eq__(self, other):
@@ -198,7 +209,7 @@ class Execution:
 
 class ExecutionContext:
 
-    def __init__(self, cache_provider=None, verbosity=False, locker=None):
+    def __init__(self, cache_provider=None, verbosity=Verbosity.INFO, locker=None):
         self._cache_provider = cache_provider
         self._execution_chain = defaultdict(list)
         self._global_kwargs = {}
@@ -224,7 +235,7 @@ class ExecutionContext:
             raise Exception('Can not pass value for {} as both argument and key-word argument.'.format(kwarg_intersection))
         kwargs.update(args_kwargs)
         exec_kwargs = self._get_kwargs(function, **kwargs)
-        execution = Execution(function, dict(self._global_kwargs), **exec_kwargs)
+        execution = Execution(function, dict(self._global_kwargs), verbosity=self._verbosity, **exec_kwargs)
         execution_chain = self._execution_chain[currentThread()]
         if execution in execution_chain:
             raise Exception('There is an execution cycle: {}.'.format(
@@ -255,7 +266,7 @@ class ExecutionContext:
         return self._verbosity
 
     def count_executions(self, function, **kwargs):
-        return self._execution_count[str(Execution(function, {}, **kwargs))]
+        return self._execution_count[str(Execution(function, {}, verbosity=self._verbosity, **kwargs))]
 
 
 def _serialize(x):
