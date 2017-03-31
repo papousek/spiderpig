@@ -87,6 +87,11 @@ class Function:
             fun.add_dependency(Function.from_serializable(dep))
         return fun
 
+    @staticmethod
+    def clear_dependencies():
+        Function._dependencies = defaultdict(list)
+        Function._dependency_names = defaultdict(set)
+
     def __call__(self, *args, **kwargs):
         return self.raw_function(*args, **kwargs)
 

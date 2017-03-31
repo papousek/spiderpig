@@ -169,6 +169,7 @@ def terminate():
     _EXECUTION_CONTEXT = None
     _CACHE_PROVIDER = None
     _STORAGE
+    execution.Function.clear_dependencies()
 
 
 class configuration:
