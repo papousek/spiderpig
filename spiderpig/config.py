@@ -6,9 +6,9 @@ def get_argument_parser():
     p = argparse.ArgumentParser()
 
     p.add_argument(
-        '--cache-dir',
+        '--spiderpig-dir',
         action='store',
-        dest='cache_dir',
+        dest='spiderpig_dir',
         default='.spiderpig'
     )
     p.add_argument(
@@ -24,9 +24,9 @@ def get_argument_parser():
         default=Verbosity.INFO,
         choices=[Verbosity.INFO, Verbosity.DEBUG, Verbosity.VERBOSE, Verbosity.INTERNAL])
     p.add_argument(
-        '--max-entries',
+        '--max-in-memory-entries',
         action='store',
-        dest='max_entries',
+        dest='max_in_memory_entries',
         default=1000
     )
     return p

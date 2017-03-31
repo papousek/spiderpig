@@ -51,7 +51,7 @@ class spiderpig(ContextDecorator):
     init
     """
 
-    def __init__(self, directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, config_file=None, **global_kwargs):
+    def __init__(self, directory=None, override_cache=False, verbosity=Verbosity.INFO, max_in_memory_entries=1000, config_file=None, **global_kwargs):
         """
         Initialize spiderpig for using it out of command-line tool.
 
@@ -64,7 +64,7 @@ class spiderpig(ContextDecorator):
             regardless of whether there is valid cache available, otherwise False
         verbosity: int, default 0
             increase verbosity level
-        max_entries: int, default 1000
+        max_in_memory_entries: int, default 1000
             maximal number of entries in in-memory cache
         config_file: str
             path to the YAML/JSON file containing key-word parameters to
@@ -75,18 +75,18 @@ class spiderpig(ContextDecorator):
         self._directory = directory
         self._override_cache = override_cache
         self._verbosity = verbosity
-        self._max_entries = max_entries
+        self._max_in_memory_entries = max_in_memory_entries
         self._global_kwargs = global_kwargs
         self._config_file = config_file
 
     def __enter__(self):
-        init(self._directory, self._override_cache, self._verbosity, self._max_entries, self._config_file, **self._global_kwargs)
+        init(self._directory, self._override_cache, self._verbosity, self._max_in_memory_entries, self._config_file, **self._global_kwargs)
 
     def __exit__(self, *exc):
         terminate()
 
 
-def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_entries=1000, config_file=None, **global_kwargs):
+def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_in_memory_entries=1000, config_file=None, **global_kwargs):
     """
     Initialize spiderpig for using it out of command-line tool.
 
@@ -99,7 +99,7 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_ent
         regardless of whether there is valid cache available, otherwise False
     verbosity: int, default 0
         increase verbosity level
-    max_entries: int, default 1000
+    max_in_memory_entries: int, default 1000
         maximal number of entries in in-memory cache
     config_file: str
         path to the YAML/JSON file containing key-word parameters to
@@ -140,14 +140,14 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_ent
             from_config_file.update(global_kwargs)
             global_kwargs= from_config_file
     if directory is None:
-        _CACHE_PROVIDER = cache.InMemoryCacheProvider(max_entries=max_entries)
+        _CACHE_PROVIDER = cache.InMemoryCacheProvider(max_entries=max_in_memory_entries)
     else:
         _STORAGE = cache.FileStorage(directory if directory else tempfile.mkdtemp())
         _CACHE_PROVIDER = cache.InMemoryCacheProvider(
             provider=cache.StorageCacheProvider(
                 storage=_STORAGE, verbosity=verbosity, override=override_cache
             ),
-            max_entries=max_entries
+            max_entries=max_in_memory_entries
         )
     _CACHE_PROVIDER.prepare()
     _EXECUTION_CONTEXT = execution.ExecutionContext(
@@ -393,7 +393,7 @@ def run_cli(command_packages=None, namespaced_command_packages=None, argument_pa
     args = vars(parser.parse_args())
 
     args = config.process_kwargs(args)
-    with spiderpig(args['cache_dir'], **{k: v for (k, v) in args.items() if k != 'func'}):
+    with spiderpig(args['spiderpig_dir'], **{k: v for (k, v) in args.items() if k != 'func'}):
         for setup_fun in setup_functions:
             execution_context().execute(setup_fun, False)
         commands.execute(args)
