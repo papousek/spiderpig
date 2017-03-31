@@ -1,4 +1,5 @@
 from pytest import raises
+from spiderpig.exceptions import ValidationError
 from spiderpig.execution import Function, ExecutionContext, Execution
 from spiderpig.func import function_name
 
@@ -43,7 +44,7 @@ def test_execution_context():
     reset_calls()
     assert context.execute(fun_a, a=3) == 3
     assert get_calls('a') == [{'a': 3}]
-    with raises(Exception):
+    with raises(ValidationError):
         context.execute(fun_a, 1, a=2)
 
 

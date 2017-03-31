@@ -1,6 +1,7 @@
 from . import cache
 from . import commands, config
 from . import execution
+from .exceptions import ValidationError, NotInitialized
 from .msg import Verbosity
 from contextlib import ContextDecorator
 from functools import wraps
@@ -135,7 +136,7 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_ent
             from_config_file = json.load(f.read()) if config_file.endswith('.json') else yaml.load(f.read())
             for key, value in from_config_file.items():
                 if hasattr(value, '__len__') and not isinstance(value, str):
-                    raise Exception('Config "{} ({})" is not scalar.'.format(key, value))
+                    raise ValidationError('Config "{} ({})" is not scalar.'.format(key, value))
             from_config_file.update(global_kwargs)
             global_kwargs= from_config_file
     if directory is None:
@@ -213,7 +214,7 @@ class configuration:
                 from_config_file = json.load(f.read()) if config_file.endswith('.json') else yaml.load(f.read())
                 for key, value in from_config_file.items():
                     if hasattr(value, '__len__') and not isinstance(value, str):
-                        raise Exception('Config "{} ({})" is not scalar.'.format(key, value))
+                        raise ValidationError('Config "{} ({})" is not scalar.'.format(key, value))
                 from_config_file.update(self._config)
                 self._config = from_config_file
 
@@ -249,7 +250,7 @@ def storage():
     """
     global _STORAGE
     if _STORAGE is None:
-        raise Exception('The storage is not initialized.')
+        raise NotInitialized('The storage is not initialized.')
     return _STORAGE
 
 
@@ -259,7 +260,7 @@ def cache_provider():
     """
     global _CACHE_PROVIDER
     if _CACHE_PROVIDER is None:
-        raise Exception('The cache provider is not initialized.')
+        raise NotInitialized('The cache provider is not initialized.')
     return _CACHE_PROVIDER
 
 
@@ -269,7 +270,7 @@ def execution_context():
     """
     global _EXECUTION_CONTEXT
     if _EXECUTION_CONTEXT is None:
-        raise Exception('The execution context is not initialized.')
+        raise NotInitialized('The execution context is not initialized.')
     return _EXECUTION_CONTEXT
 
 

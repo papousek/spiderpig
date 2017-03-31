@@ -1,4 +1,5 @@
 from multiprocessing.pool import ThreadPool
+from pytest import raises
 from spiderpig.msg import Verbosity
 from time import sleep
 import spiderpig
@@ -35,6 +36,18 @@ def test_cached():
         assert spiderpig.execution_context().count_executions(cached_fun) == 1
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=1) == 0
         assert spiderpig.execution_context().count_executions(cached_fun_b) == 0
+    with spiderpig.spiderpig(cache_dir, a=2, verbosity=Verbosity.INTERNAL):
+        assert cached_fun() == (2, 2)
+        assert spiderpig.execution_context().count_executions(cached_fun) == 1
+        assert spiderpig.execution_context().count_executions(cached_fun_a, a=2) == 1
+
+
+def test_exceptions():
+    with spiderpig.spiderpig(verbosity=Verbosity.INTERNAL):
+        with raises(RandomError):
+            errored()
+        with raises(RandomError):
+            errored()
 
 
 def test_concurrency():
@@ -73,6 +86,15 @@ def cached_fun_b(b=2):
 @spiderpig.cached()
 def cached_fun():
     return cached_fun_a(), cached_fun_b()
+
+
+class RandomError(Exception):
+    pass
+
+
+@spiderpig.cached()
+def errored():
+    raise RandomError()
 
 
 @spiderpig.cached()

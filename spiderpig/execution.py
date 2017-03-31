@@ -1,3 +1,4 @@
+from .exceptions import ValidationError, CyclicExecution
 from .func import function_name
 from .msg import Verbosity, print_debug
 from clint.textui import indent
@@ -232,23 +233,26 @@ class ExecutionContext:
         args_kwargs = dict(zip(arg_names, args))
         kwarg_intersection = set(args_kwargs.keys()) & set(kwargs)
         if len(kwarg_intersection) > 0:
-            raise Exception('Can not pass value for {} as both argument and key-word argument.'.format(kwarg_intersection))
+            raise ValidationError('Can not pass value for {} as both argument and key-word argument.'.format(kwarg_intersection))
         kwargs.update(args_kwargs)
         exec_kwargs = self._get_kwargs(function, **kwargs)
         execution = Execution(function, dict(self._global_kwargs), verbosity=self.verbosity, **exec_kwargs)
         execution_chain = self._execution_chain[currentThread()]
         if execution in execution_chain:
-            raise Exception('There is an execution cycle: {}.'.format(
-                execution.function.name
+            raise CyclicExecution('There is an execution cycle: {} -> {}'.format(
+                execution.function.name,
+                [str(e) for e in execution_chain]
             ))
         for execution_segment in execution_chain:
             execution_segment.add_dependency(execution)
             execution_segment.function.add_dependency(execution.function)
         execution_chain.append(execution)
-        executed, result = (True, execution()) if (self._cache_provider is None or not use_cache) else self._cache_provider.get_or_execute(execution)
-        with self._locker.lock(execution):
-            self._execution_count[str(execution)] += executed
-        execution_chain.pop()
+        try:
+            executed, result = (True, execution()) if (self._cache_provider is None or not use_cache) else self._cache_provider.get_or_execute(execution)
+            with self._locker.lock(execution):
+                self._execution_count[str(execution)] += executed
+        finally:
+            execution_chain.pop()
         return result
 
     def _get_kwargs(self, function, **cache_kwargs):
