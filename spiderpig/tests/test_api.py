@@ -8,36 +8,39 @@ import tempfile
 
 def test_configured():
     with spiderpig.spiderpig(a=1, verbosity=Verbosity.INTERNAL):
-        assert fun() == (1, 2)
+        assert fun() == (1, 3)
         with spiderpig.configuration(a=2, b=3):
-            assert fun() == (2, 3)
-        assert fun() == (1, 2)
-        assert fun(a=2) == (2, 2)
+            assert fun() == (2, 5)
+        assert fun() == (1, 3)
+        assert fun(a=2) == (2, 4)
 
 
 def test_cached():
     cache_dir = tempfile.mkdtemp()
     with spiderpig.spiderpig(cache_dir, a=1, verbosity=Verbosity.INTERNAL):
-        assert cached_fun() == (1, 2)
+        assert cached_fun() == (1, 3, 10)
         assert spiderpig.execution_context().count_executions(cached_fun) == 1
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=1) == 1
         assert spiderpig.execution_context().count_executions(cached_fun_b) == 1
+        assert spiderpig.execution_context().count_executions(cached_fun_c) == 1
     with spiderpig.spiderpig(cache_dir, a=1, verbosity=Verbosity.INTERNAL):
-        assert cached_fun() == (1, 2)
+        assert cached_fun() == (1, 3, 10)
         assert spiderpig.execution_context().count_executions(cached_fun) == 0
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=1) == 0
         assert spiderpig.execution_context().count_executions(cached_fun_b) == 0
+        assert spiderpig.execution_context().count_executions(cached_fun_c) == 0
     with spiderpig.spiderpig(cache_dir, override_cache=True, a=1, verbosity=Verbosity.INTERNAL):
         assert cached_fun_a() == 1
         assert cached_fun_a() == 1
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=1) == 1
     with spiderpig.spiderpig(cache_dir, a=1, verbosity=Verbosity.INTERNAL):
-        assert cached_fun() == (1, 2)
+        assert cached_fun() == (1, 3, 10)
         assert spiderpig.execution_context().count_executions(cached_fun) == 1
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=1) == 0
-        assert spiderpig.execution_context().count_executions(cached_fun_b) == 0
+        assert spiderpig.execution_context().count_executions(cached_fun_b) == 1
+        assert spiderpig.execution_context().count_executions(cached_fun_c) == 0
     with spiderpig.spiderpig(cache_dir, a=2, verbosity=Verbosity.INTERNAL):
-        assert cached_fun() == (2, 2)
+        assert cached_fun() == (2, 4, 10)
         assert spiderpig.execution_context().count_executions(cached_fun) == 1
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=2) == 1
 
@@ -65,7 +68,7 @@ def fun_a(a=None):
 
 @spiderpig.configured()
 def fun_b(b=2):
-    return b
+    return b + fun_a()
 
 
 @spiderpig.configured()
@@ -80,12 +83,17 @@ def cached_fun_a(a=None):
 
 @spiderpig.cached()
 def cached_fun_b(b=2):
-    return b
+    return b + cached_fun_a()
+
+
+@spiderpig.cached()
+def cached_fun_c(c=10):
+    return c
 
 
 @spiderpig.cached()
 def cached_fun():
-    return cached_fun_a(), cached_fun_b()
+    return cached_fun_a(), cached_fun_b(), cached_fun_c()
 
 
 class RandomError(Exception):
