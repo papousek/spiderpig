@@ -45,6 +45,30 @@ def test_cached():
         assert spiderpig.execution_context().count_executions(cached_fun_a, a=2) == 1
 
 
+def test_in_memory_entries():
+    cache_dir = tempfile.mkdtemp()
+    with spiderpig.spiderpig(cache_dir, max_in_memory_entries=10):
+        for i in range(100):
+            assert cached_fun_a(a=i) == i
+        assert spiderpig.cache_provider().size() <= 10
+    with spiderpig.spiderpig(cache_dir, max_in_memory_entries=10):
+        for i in range(100):
+            assert cached_fun_a(a=i) == i
+            assert spiderpig.execution_context().count_executions(cached_fun_a, a=i) == 0
+            assert spiderpig.cache_provider().size() <= 10
+    cache_dir = tempfile.mkdtemp()
+    spiderpig.init(cache_dir, max_in_memory_entries=10)
+    for i in range(100):
+        assert cached_fun_a(a=i) == i
+    assert spiderpig.cache_provider().size() <= 10
+    spiderpig.terminate()
+    spiderpig.init(cache_dir, max_in_memory_entries=10)
+    for i in range(100):
+        assert cached_fun_a(a=i) == i
+        assert spiderpig.execution_context().count_executions(cached_fun_a, a=i) == 0
+        assert spiderpig.cache_provider().size() <= 10
+
+
 def test_exceptions():
     with spiderpig.spiderpig(verbosity=Verbosity.INTERNAL):
         with raises(RandomError):
