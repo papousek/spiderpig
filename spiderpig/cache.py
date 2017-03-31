@@ -116,6 +116,8 @@ class StorageCacheProvider(CacheProvider):
             self._storage.write_info(init=True)
             self._time = self._storage.read_info_time()
             self._storage.write_info(override_time=self._time)
+            for _ in self._storage.read_executions():
+                pass
             if self._provider is not None:
                 self._provider.prepare()
 
