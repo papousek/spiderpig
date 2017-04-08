@@ -3,3 +3,6 @@ theme: readthedocs
 pages:
   - 'Introduction': index.md
   - 'Examples': examples.md
+google_analytics:
+  - 'UA-96989720-2'
+  - 'auto'
