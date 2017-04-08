@@ -7,7 +7,7 @@ functions without side effect based on values of its parameters and parameters
 of dependent functions.
 
 ## Features
-1. Organizes your code analysing data.
+1. Organizes your code analyzing data.
 2. Makes one global configuration for all specified functions.
 3. Caches time-expensive computations to save time.
 

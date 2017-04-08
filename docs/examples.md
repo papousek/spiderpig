@@ -12,8 +12,8 @@ who: world
 
 Spiderpig is able to inject the configuration property ``who`` to all functions
 annotated by ``spiderpig.configured`` decorator. This configuration can be
-locally overriden by ``spiderpig.configuration`` context. If the parameter is
-given when the function is invoked, the global configuration is also overriden
+locally overridden by ``spiderpig.configuration`` context. If the parameter is
+given when the function is invoked, the global configuration is also overridden
 including all nested invocations of other spiderpig functions.
 
 ```python
@@ -46,7 +46,7 @@ Hello everybody
 God: Hello Jesus
 ```
 
-Instead of specifying configuration file, the parameters can be passed directly
+Instead of specifying the configuration file, the parameters can be passed directly
 to ``spiderpig.spiderpig`` (or ``spiderpig.init``):
 
 ```python
@@ -56,7 +56,7 @@ with sp.spiderpig(who='world'):
 
 ## Caching
 
-Spiderpig is also able to cache time-expensive compuations. In this case, the
+Spiderpig is also able to cache time-expensive computations. In this case, the
 working directory has to be specified. Imagine the following scenario where we
 try to compute the Fibonacci numbers:
 
