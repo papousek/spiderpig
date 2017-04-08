@@ -186,7 +186,7 @@ Spiderpig automatically loads your commands and make them accessible for you.
 $ ./crawler.py --help
 
 usage: crawler.py [-h] [--cache-dir CACHE_DIR] [--override-cache]
-                  [--verbosity {0,1,2,3}] [--max-entries MAX_ENTRIES]
+                  [--verbosity {0,1,2,3}] [--max-in-memory-entries MAX_IN_MEMORY_ENTRIES]
                   {url-html,wiki-intro,spiderpig-executions} ...
 
 positional arguments:
@@ -203,7 +203,7 @@ optional arguments:
   --cache-dir CACHE_DIR
   --override-cache
   --verbosity {0,1,2,3}
-  --max-entries MAX_ENTRIES
+  --max-in-memory-entries MAX_IN_MEMORY_ENTRIES
 $
 ```
 It automatically creates `argparse` configuration parsers from parameters of your
