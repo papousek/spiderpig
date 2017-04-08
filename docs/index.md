@@ -6,6 +6,10 @@ a global context/configuration. It also introduces caching of executions of
 functions without side effect based on values of its parameters and parameters
 of dependent functions.
 
+## Source Code
+
+See [the GitHub repository](https://github.com/papousek/spiderpig).
+
 ## Features
 1. Organizes your code analyzing data.
 2. Makes one global configuration for all specified functions.
