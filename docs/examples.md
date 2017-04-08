@@ -57,8 +57,8 @@ with sp.spiderpig(who='world'):
 ## Caching
 
 Spiderpig is also able to cache time-expensive compuations. In this case, the
-working directory has to specifyied. Imagine the following scenario where we
-try to compute fibonacci numbers:
+working directory has to be specifyied. Imagine the following scenario where we
+try to compute the Fibonacci numbers:
 
 ```python
 import spiderpig as sp
