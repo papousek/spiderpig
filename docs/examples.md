@@ -4,7 +4,7 @@ The best way to explain the features spiderpig gives you is to show it in use.
 
 ## Configuration Only
 
-Image we have the following configuration stored in ``config.yaml``:
+Imagine we have the following configuration stored in ``config.yaml``:
 
 ```yaml
 who: world
