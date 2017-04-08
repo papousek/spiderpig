@@ -258,9 +258,9 @@ class FileStorage(Storage):
 
     def read_executions(self, function=None):
         if function is None:
-            walker = iglob('{}/**/**.execution.info.pickle'.format(self._directory), recursive=True)
+            walker = iglob(os.path.join(self._directory, '**', '**.execution.info.pickle'), recursive=True)
         else:
-            walker = iglob('{}/{}/*.execution.info.pickle'.format(self._directory, function.name.replace('.', '/')))
+            walker = iglob(os.path.join(self._directory, function.name.replace('.', os.sep), '*.execution.info.pickle'))
         for path in walker:
             with open(path, 'rb') as f:
                 yield Execution.from_serializable(pickle.load(f))
@@ -287,14 +287,14 @@ class FileStorage(Storage):
             pickle.dump(info, f)
 
     def clear(self):
-        for f in glob.iglob('{}/*'.format(self._directory)):
+        for f in glob.iglob(os.path.join(self._directory, '*')):
             try:
                 os.remove(f)
             except IsADirectoryError:
                 shutil.rmtree(f, ignore_errors=True)
 
     def _get_filename(self, object_name, extension, prepare=False):
-        filename = '{}/{}.{}'.format(self._directory, object_name.replace('.', '/'), extension)
+        filename = os.path.join(self._directory, '{}.{}'.format(object_name.replace('.', os.sep), extension))
         if prepare:
             directory = os.path.dirname(filename)
             if not os.path.exists(directory):

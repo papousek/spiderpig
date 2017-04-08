@@ -308,7 +308,7 @@ class Locker:
             os.makedirs(self._directory)
 
     def clear(self):
-        for filename in iglob('{}/*.lock'.format(self._directory)):
+        for filename in iglob(os.path.join(self._directory, '*.lock')):
             try:
                 os.remove(filename)
             except OSError:
@@ -316,7 +316,7 @@ class Locker:
 
     def lock(self, obj=None):
         name = 'spiderpig.global' if obj is None else obj.name
-        return LockWrapper(obj, filelock.FileLock('{}/{}.lock'.format(self._directory, name)), self._verbosity)
+        return LockWrapper(obj, filelock.FileLock(os.path.join(self._directory, '{}.lock'.format(name))), self._verbosity)
 
     def to_serializable(self):
         return {'directory': self._directory}
