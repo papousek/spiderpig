@@ -1,6 +1,7 @@
 from .exceptions import ValidationError
 from .msg import Verbosity
 import argparse
+import os
 
 
 def get_argument_parser():
@@ -69,10 +70,12 @@ class Configuration:
             return self._kwargs[key]
         if self._configuration is not None and key in self._configuration:
             return self._configuration[key]
+        if key.upper() in os.environ:
+            return _convert_kwarg_value(os.environ[key.upper()])
         raise KeyError(key)
 
     def __contains__(self, key):
-        return key in self._kwargs or (self._configuration is not None and key in self._configuration)
+        return key in self._kwargs or (self._configuration is not None and key in self._configuration) or key.upper() in os.environ
 
     def to_serializable(self):
         result = {

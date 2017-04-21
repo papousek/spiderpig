@@ -2,6 +2,7 @@ from multiprocessing.pool import ThreadPool
 from pytest import raises
 from spiderpig.msg import Verbosity
 from time import sleep
+import os
 import spiderpig
 import tempfile
 
@@ -13,6 +14,17 @@ def test_configured():
             assert fun() == (2, 5)
         assert fun() == (1, 3)
         assert fun(a=2) == (2, 4)
+    with spiderpig.spiderpig(verbosity=Verbosity.INTERNAL):
+        try:
+            os.environ['A'] = '10'
+            assert fun() == (10, 12)
+            os.environ['B'] = '3'
+            assert fun() == (10, 13)
+        finally:
+            if 'A' in os.environ:
+                del os.environ['A']
+            if 'B' in os.environ:
+                del os.environ['B']
 
 
 def test_cached():
