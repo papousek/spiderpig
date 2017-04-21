@@ -11,7 +11,7 @@ import tempfile
 import yaml
 
 
-__VERSION__ = '2.2.0'
+__VERSION__ = '2.3.0-dev'
 
 
 _EXECUTION_CONTEXT = None

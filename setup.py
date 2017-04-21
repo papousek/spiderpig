@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='spiderpig',
-    version='2.2.0',
+    version='2.3.0-dev',
     description='Caching and execution library for data analysis.',
     author='Jan Papousek',
     author_email='jan.papousek@gmail.com',
