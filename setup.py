@@ -18,6 +18,7 @@ setup(
         'argcomplete',
         'clint',
         'filelock',
+        'html2text',
         'PyYAML',
     ],
     license='MIT',
