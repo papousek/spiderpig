@@ -1,4 +1,5 @@
 from pytest import raises
+from spiderpig.config import Configuration
 from spiderpig.exceptions import ValidationError
 from spiderpig.execution import Function, ExecutionContext, Execution
 from spiderpig.func import function_name
@@ -26,7 +27,7 @@ def test_function():
 
 def test_execution():
     reset_calls()
-    execution = Execution(fun_a, {}, a=1)
+    execution = Execution(fun_a, Configuration(), a=1)
     s_execution = Execution.from_serializable(execution.to_serializable())
     assert s_execution == execution
     assert execution() == 1
@@ -35,8 +36,7 @@ def test_execution():
 
 def test_execution_context():
     reset_calls()
-    context = ExecutionContext()
-    context.add_global_kwargs(a=2)
+    context = ExecutionContext(Configuration(a=2))
     assert context.execute(fun_a) == 2
     assert get_calls('a') == [{'a': 2}]
     assert context.count_executions(fun_a, a=2) == 1

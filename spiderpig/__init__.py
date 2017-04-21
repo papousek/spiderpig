@@ -151,10 +151,10 @@ def init(directory=None, override_cache=False, verbosity=Verbosity.INFO, max_in_
         )
     _CACHE_PROVIDER.prepare()
     _EXECUTION_CONTEXT = execution.ExecutionContext(
+        configuration=config.Configuration(**global_kwargs),
         cache_provider=_CACHE_PROVIDER,
         verbosity=verbosity
     )
-    _EXECUTION_CONTEXT.add_global_kwargs(**global_kwargs)
 
 
 def terminate():
@@ -225,11 +225,13 @@ class configuration:
         self._current_exec_context = execution_context()
         global _EXECUTION_CONTEXT
         _EXECUTION_CONTEXT = execution.ExecutionContext(
+            configuration=config.Configuration(
+                configuration=None if self._current_exec_context is None else self._current_exec_context.configuration,
+                **self._config
+            ),
             cache_provider=_CACHE_PROVIDER,
             verbosity=self._current_exec_context.verbosity
         )
-        _EXECUTION_CONTEXT.add_global_kwargs(**self._current_exec_context.global_kwargs)
-        _EXECUTION_CONTEXT.add_global_kwargs(**self._config)
         return self
 
     def __exit__(self, *exc):

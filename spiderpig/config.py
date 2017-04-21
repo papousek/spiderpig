@@ -1,3 +1,4 @@
+from .exceptions import ValidationError
 from .msg import Verbosity
 import argparse
 
@@ -53,3 +54,38 @@ def _convert_kwarg_value(val):
         except ValueError:
             return val
     return val
+
+
+class Configuration:
+
+    def __init__(self, configuration=None, **kwargs):
+        self._kwargs = process_kwargs(kwargs)
+        self._configuration = configuration
+
+    def __getitem__(self, key):
+        if not isinstance(key, str):
+            raise ValidationError('The key argument has to be a string.')
+        if key in self._kwargs:
+            return self._kwargs[key]
+        if self._configuration is not None and key in self._configuration:
+            return self._configuration[key]
+        raise KeyError(key)
+
+    def __contains__(self, key):
+        return key in self._kwargs or (self._configuration is not None and key in self._configuration)
+
+    def to_serializable(self):
+        result = {
+            'kwargs': dict(self._kwargs),
+        }
+        if self._configuration is not None:
+            result['configuration'] = self._configuration.to_serializable()
+        return result
+
+    @staticmethod
+    def from_serializable(serializable):
+        configuration = None if 'configuration' not in serializable else Configuration.from_serializable(serializable['configuration'])
+        return Configuration(configuration, **serializable['kwargs'])
+
+    def __str__(self):
+        return str(self._kwargs)

@@ -1,3 +1,4 @@
+from .config import Configuration
 from .exceptions import ValidationError, CyclicExecution
 from .func import function_name
 from .msg import Verbosity, print_debug
@@ -107,14 +108,14 @@ class Function:
 
 class Execution:
 
-    def __init__(self, function, context_kwargs, verbosity=Verbosity.INFO, **kwargs):
+    def __init__(self, function, configuration, verbosity=Verbosity.INFO, **kwargs):
         if isinstance(function, Function):
             self._function = function
         elif isinstance(function, str):
             self._function = Function.from_name(function)
         else:
             self._function = Function(function)
-        self._context_kwargs = context_kwargs
+        self._configuration = configuration
         self._kwargs = kwargs
         self._value = None
         self._executed = False
@@ -128,7 +129,11 @@ class Execution:
 
     @property
     def context_kwargs(self):
-        return dict(self._context_kwargs)
+        context_kwargs = {}
+        for arg in self.function.dependent_arguments:
+            if arg in self._configuration and arg not in self.kwargs:
+                context_kwargs[arg] = self._configuration[arg]
+        return context_kwargs
 
     @property
     def dependencies(self):
@@ -144,18 +149,14 @@ class Execution:
 
     @property
     def name(self):
-        context_kwargs = {}
-        for arg in self.function.dependent_arguments:
-            if arg in self._context_kwargs and arg not in self.kwargs:
-                context_kwargs[arg] = self._context_kwargs[arg]
         return '{}.{}'.format(self.function.name, hashlib.sha1((
-            self.function.name + _serialize(self.kwargs) + _serialize(context_kwargs)
+            self.function.name + _serialize(self.kwargs) + _serialize(self.context_kwargs)
         ).encode()).hexdigest())
 
     def to_serializable(self):
         return {
             'function': self.function.to_serializable(),
-            'context_kwargs': self._context_kwargs,
+            'configuration': self._configuration.to_serializable(),
             'kwargs': self.kwargs,
             'dependencies': [e.to_serializable() for e in self._dependencies],
         }
@@ -164,7 +165,7 @@ class Execution:
     def from_serializable(serializable, verbosity=Verbosity.INFO):
         execution = Execution(
             function=Function.from_serializable(serializable['function']),
-            context_kwargs=serializable['context_kwargs'],
+            configuration=Configuration.from_serializable(serializable['configuration']),
             verbosity=verbosity,
             **serializable['kwargs']
         )
@@ -215,22 +216,17 @@ class Execution:
 
 class ExecutionContext:
 
-    def __init__(self, cache_provider=None, verbosity=Verbosity.INFO, locker=None):
+    def __init__(self, configuration=None, cache_provider=None, verbosity=Verbosity.INFO, locker=None):
         self._cache_provider = cache_provider
         self._execution_chain = defaultdict(list)
-        self._global_kwargs = {}
+        self._configuration = configuration if configuration else Configuration()
         self._execution_count = defaultdict(lambda: 0)
         self._verbosity = verbosity
         self._locker = locker if locker else (cache_provider._locker if cache_provider else Locker())
 
     @property
-    def global_kwargs(self):
-        return dict(self._global_kwargs)
-
-    def add_global_kwargs(self, **kwargs):
-        with self._locker.lock():
-            for key, value in kwargs.items():
-                self._global_kwargs[key] = value
+    def configuration(self):
+        return self._configuration
 
     def execute(self, raw_function, *args, use_cache=True, **kwargs):
         function = Function(raw_function)
@@ -241,7 +237,7 @@ class ExecutionContext:
             raise ValidationError('Can not pass value for {} as both argument and key-word argument.'.format(kwarg_intersection))
         kwargs.update(args_kwargs)
         exec_kwargs = self._get_kwargs(function, **kwargs)
-        execution = Execution(function, dict(self._global_kwargs), verbosity=self.verbosity, **exec_kwargs)
+        execution = Execution(function, self._configuration, verbosity=self.verbosity, **exec_kwargs)
         execution_chain = self._execution_chain[currentThread()]
         if execution in execution_chain:
             raise CyclicExecution('There is an execution cycle: {} -> {}'.format(
@@ -266,9 +262,9 @@ class ExecutionContext:
             for key, value in execution_segment.kwargs.items():
                 if key in valid_args and key not in cache_kwargs:
                     cache_kwargs[key] = value
-        for key, value in self._global_kwargs.items():
-            if key in valid_args and key not in cache_kwargs:
-                cache_kwargs[key] = value
+        for arg in valid_args:
+            if arg in self._configuration and arg not in cache_kwargs:
+                cache_kwargs[arg] = self._configuration[arg]
         return cache_kwargs
 
     @property
