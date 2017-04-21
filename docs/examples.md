@@ -54,6 +54,23 @@ with sp.spiderpig(who='world'):
     ...
 ```
 
+Or you can use environment variables:
+
+```bash
+export WHO=world
+```
+```python
+with sp.spiderpig():
+    hello()
+    with sp.configuration(who='universe'):
+        hello()
+```
+Resulting output:
+```
+Hello world
+Hello universe
+```
+
 ## Caching
 
 Spiderpig is also able to cache time-expensive computations. In this case, the

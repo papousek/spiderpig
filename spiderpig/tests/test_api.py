@@ -20,6 +20,9 @@ def test_configured():
             assert fun() == (10, 12)
             os.environ['B'] = '3'
             assert fun() == (10, 13)
+            assert fun(a=1) == (1, 4)
+            with spiderpig.configuration(a=2):
+                assert fun() == (2, 5)
         finally:
             if 'A' in os.environ:
                 del os.environ['A']
