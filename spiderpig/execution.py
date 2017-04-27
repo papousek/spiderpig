@@ -250,8 +250,7 @@ class ExecutionContext:
         execution_chain.append(execution)
         try:
             executed, result = (True, execution()) if (self._cache_provider is None or not use_cache) else self._cache_provider.get_or_execute(execution)
-            with self._locker.lock(execution):
-                self._execution_count[str(execution)] += executed
+            self._execution_count[str(execution)] += executed
         finally:
             execution_chain.pop()
         return result
