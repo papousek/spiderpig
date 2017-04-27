@@ -11,4 +11,4 @@ install:
   - pip install pytest
   - make install
 script:
-  - make test
+  - py.test -s
