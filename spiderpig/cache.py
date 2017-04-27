@@ -1,9 +1,8 @@
 from .execution import Locker, Execution
 from .msg import Verbosity
-from glob2 import iglob
+from glob import iglob
 from pathlib import Path
 import abc
-import glob
 import os
 import pickle
 import shutil
@@ -287,7 +286,7 @@ class FileStorage(Storage):
             pickle.dump(info, f)
 
     def clear(self):
-        for f in glob.iglob(os.path.join(self._directory, '*')):
+        for f in iglob(os.path.join(self._directory, '*')):
             try:
                 os.remove(f)
             except IsADirectoryError:

@@ -18,7 +18,6 @@ setup(
         'argcomplete',
         'clint',
         'filelock',
-        'glob2',
         'html2text',
         'PyYAML',
     ],
