@@ -1,6 +1,7 @@
 from .execution import Locker, Execution
 from .msg import Verbosity
-from glob import iglob
+from glob2 import iglob
+from pathlib import Path
 import abc
 import glob
 import math
@@ -154,9 +155,9 @@ class StorageCacheProvider(CacheProvider):
 
     def _get_execution_dependencies_max_time(self, execution):
         times = [self._storage.read_execution_time(d) for d in execution.dependencies]
-        times = [(t if t is not None else math.inf) for t in times]
+        times = [(t if t is not None else float('inf')) for t in times]
         if len(times) == 0:
-            return - math.inf
+            return - float('inf')
         return max(times)
 
 
@@ -258,11 +259,11 @@ class FileStorage(Storage):
 
     def read_executions(self, function=None):
         if function is None:
-            walker = iglob(os.path.join(self._directory, '**', '**.execution.info.pickle'), recursive=True)
+            walker = Path(self._directory).glob(os.path.join('**', '*.execution.info.pickle'))
         else:
             walker = iglob(os.path.join(self._directory, function.name.replace('.', os.sep), '*.execution.info.pickle'))
         for path in walker:
-            with open(path, 'rb') as f:
+            with open(str(path), 'rb') as f:
                 yield Execution.from_serializable(pickle.load(f))
 
     def read_info(self):
