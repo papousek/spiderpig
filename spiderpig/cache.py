@@ -4,7 +4,6 @@ from glob2 import iglob
 from pathlib import Path
 import abc
 import glob
-import math
 import os
 import pickle
 import shutil
