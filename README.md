@@ -39,7 +39,7 @@ Execute the following commands:
 
 ```
 git checkout master
-git pull origin master --rebase
+git pull --rebase origin master
 bumpversion release
 python setup.py sdist bdist_wheel upload
 bumpversion --no-tag minor
