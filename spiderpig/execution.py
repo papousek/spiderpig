@@ -82,6 +82,32 @@ class Function:
         }
 
     @staticmethod
+    def merge_serializables(first, second):
+        if first is None:
+            return second
+        if second is None:
+            return first
+        if first['function_name'] != second['function_name']:
+            raise ValidationError('Only serializables for one function can be merged.')
+        dependencies_by_name_first = {}
+        dependencies_by_name_second = {}
+        for d in first['dependencies']:
+            dependencies_by_name_first[d['function_name']] = d
+        for d in second['dependencies']:
+            dependencies_by_name_second[d['function_name']] = d
+        dependencies_by_name = {}
+        for d in dependencies_by_name_first.values():
+            dependencies_by_name[d['function_name']] = Function.merge_serializables(d, dependencies_by_name_second.get(d['function_name']))
+        for d in dependencies_by_name_second.values():
+            if d['function_name'] in dependencies_by_name:
+                continue
+            dependencies_by_name[d['function_name']] = Function.merge_serializables(d, dependencies_by_name_first.get(d['function_name']))
+        return {
+            'function_name': first['function_name'],
+            'dependencies': list(dependencies_by_name.values()),
+        }
+
+    @staticmethod
     def from_serializable(serializable):
         fun = Function.from_name(serializable['function_name'])
         for dep in serializable['dependencies']:

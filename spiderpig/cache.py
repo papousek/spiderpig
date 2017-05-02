@@ -1,4 +1,4 @@
-from .execution import Locker, Execution
+from .execution import Locker, Execution, Function
 from .msg import Verbosity
 from glob import iglob
 from pathlib import Path
@@ -115,7 +115,7 @@ class StorageCacheProvider(CacheProvider):
             self._storage.write_info(init=True)
             self._time = self._storage.read_info_time()
             self._storage.write_info(override_time=self._time)
-            for _ in self._storage.read_executions():
+            for _ in self._storage.read_functions():
                 pass
             if self._provider is not None:
                 self._provider.prepare()
@@ -130,6 +130,8 @@ class StorageCacheProvider(CacheProvider):
             else:
                 executed, self._provider.get_or_execute(execution, already_exclusive=True)
             self._storage.write_execution_result(execution)
+        with self.lock(execution.function):
+            self._storage.write_function(execution.function)
         return executed, self._storage.read_execution_result(execution)
 
     def size(self):
@@ -166,6 +168,10 @@ class Storage(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def write_function(self, function):
+        pass
+
+    @abc.abstractmethod
     def write_execution_result(self, execution):
         pass
 
@@ -198,6 +204,10 @@ class Storage(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def read_functions(self):
+        pass
+
+    @abc.abstractmethod
     def clear(self):
         pass
 
@@ -219,6 +229,15 @@ class FileStorage(Storage):
         filename = self._get_filename(execution.name, 'execution.info.pickle', prepare=True)
         with open(filename, 'wb') as f:
             pickle.dump(execution.to_serializable(), f)
+
+    def write_function(self, function):
+        filename = self._get_filename(function.name, 'function.info.pickle', prepare=True)
+        old_serializable = None
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
+                old_serializable = pickle.load(f)
+        with open(filename, 'wb') as f:
+            pickle.dump(Function.merge_serializables(function.to_serializable(), old_serializable), f)
 
     def write_execution_ready(self, execution):
         filename = self._get_filename(execution.name, 'execution.ready', prepare=True)
@@ -291,6 +310,11 @@ class FileStorage(Storage):
                 os.remove(f)
             except IsADirectoryError:
                 shutil.rmtree(f, ignore_errors=True)
+
+    def read_functions(self):
+        for path in Path(self._directory).glob(os.path.join('**', '*.function.info.pickle')):
+            with open(str(path), 'rb') as f:
+                yield Function.from_serializable(pickle.load(f))
 
     def _get_filename(self, object_name, extension, prepare=False):
         filename = os.path.join(self._directory, '{}.{}'.format(object_name.replace('.', os.sep), extension))
