@@ -398,5 +398,5 @@ def run_cli(command_packages=None, namespaced_command_packages=None, argument_pa
     args = config.process_kwargs(args)
     with spiderpig(args['spiderpig_dir'], **{k: v for (k, v) in args.items() if k != 'func'}):
         for setup_fun in setup_functions:
-            execution_context().execute(setup_fun, False)
+            execution_context().execute(setup_fun, use_cache=False)
         commands.execute(args)
