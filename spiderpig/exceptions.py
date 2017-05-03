@@ -12,3 +12,7 @@ class NotInitialized(SpiderpigError):
 
 class CyclicExecution(SpiderpigError):
     pass
+
+
+class TooManyDependencies(SpiderpigError):
+    pass

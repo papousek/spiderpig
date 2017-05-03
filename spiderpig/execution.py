@@ -1,5 +1,5 @@
 from .config import Configuration
-from .exceptions import ValidationError, CyclicExecution
+from .exceptions import ValidationError, CyclicExecution, TooManyDependencies
 from .func import function_name
 from .msg import Verbosity, print_debug
 from clint.textui import indent
@@ -16,6 +16,9 @@ import json
 import os
 import re
 import tempfile
+
+
+DEPENDENCY_UPPER_BOUND = 500
 
 
 class Function:
@@ -195,6 +198,8 @@ class Execution:
             verbosity=verbosity,
             **serializable['kwargs']
         )
+        if len(serializable['dependencies']) > DEPENDENCY_UPPER_BOUND:
+            raise TooManyDependencies('The execution {} has too many dependencies'.format(execution))
         for d in serializable['dependencies']:
             execution.add_dependency(Execution.from_serializable(d, verbosity=verbosity))
         return execution

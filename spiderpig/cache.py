@@ -1,5 +1,6 @@
+from .exceptions import TooManyDependencies
 from .execution import Locker, Execution, Function
-from .msg import Verbosity
+from .msg import Verbosity, print_warn
 from glob import iglob
 from pathlib import Path
 import abc
@@ -140,9 +141,13 @@ class StorageCacheProvider(CacheProvider):
 
     def is_valid_cache(self, execution, reread=True):
         if reread:
-            execution = self._storage.read_execution(execution)
-            if execution is None:
-                return False
+            try:
+                execution = self._storage.read_execution(execution)
+                if execution is None:
+                    return False
+            except TooManyDependencies as e:
+                print_warn(str(e))
+                return self._storage.is_execution_ready(execution)
         execution_time = self._storage.read_execution_time(execution)
         if self._override and execution_time < self._time:
             return False
@@ -185,6 +190,10 @@ class Storage(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def read_execution(self, execution):
+        pass
+
+    @abc.abstractmethod
+    def is_execution_ready(self, execution):
         pass
 
     @abc.abstractmethod

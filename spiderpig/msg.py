@@ -21,4 +21,8 @@ def print_success(msg):
 
 
 def print_error(msg):
-    puts(colored.red(str(msg)))
+    puts(colored.red('ERROR: ' + str(msg)))
+
+
+def print_warn(msg):
+    puts(colored.magenta('WARNING: ' + str(msg)))
