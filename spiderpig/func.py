@@ -5,21 +5,16 @@ def is_lambda(fun):
     """
     Check whether the given function is a lambda function.
 
-    .. testsetup::
-
-        from spiderpig.func import is_lambda
-
-    .. testcode::
-
-        def not_lambda_fun(): ---------------------------------------------------------------------------------------------------------------------------------------------------------------- ---
-        lambda_fun = lambda:
-
-        print(
-            is_lambda(not_lambda_fun),
-            is_lambda(lambda_fun)
-        )
-    .. testoutput::
-
+        >>> def not_lambda_fun():
+        ...     return None
+        ...
+        >>> lambda_fun = lambda: None
+        ...
+        >>> print(
+        ...     is_lambda(not_lambda_fun),
+        ...     is_lambda(lambda_fun)
+        ... )
+        ...
         False True
 
     Args:
